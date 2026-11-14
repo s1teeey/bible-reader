@@ -169,6 +169,8 @@ main{min-width:0;overflow:auto;position:relative}
 .filters button.on{color:var(--ink);border-bottom-color:var(--accent)}
 
 /* people */
+.psearch{margin-bottom:22px}
+.psearch input{max-width:320px}
 .people{display:grid;grid-template-columns:180px 1fr;gap:40px}
 .plist button{display:block;width:100%;text-align:left;padding:6px 0;font-weight:700;color:var(--muted);border-bottom:1px solid var(--line);font-size:14.5px}
 .plist button:hover{color:var(--ink)}

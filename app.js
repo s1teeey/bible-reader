@@ -173,9 +173,11 @@ async function ask(scope){
  const key=ls.get("br.ai","");
  if(!key){window.open("https://claude.ai/new?q="+encodeURIComponent(prompt),"_blank");return}
  out.hidden=false;out.textContent="…";
- try{const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-  body:JSON.stringify({model:"claude-sonnet-5-5",max_tokens:1600,system:"你是熟悉新約聖經、原文與歷史背景的查經同伴。用繁體中文回答，先講結論，再用簡短段落說明；必要時加一段「白話講」。不要說教。",messages:[{role:"user",content:prompt}]})});
-  const j=await r.json();out.textContent=j.content?j.content.map(x=>x.text||"").join(""):"錯誤："+(j.error?.message||r.status)}catch(e){out.textContent="連線失敗："+e.message}
+ try{const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-beta":"server-side-fallback-2026-07-01","anthropic-dangerous-direct-browser-access":"true"},
+  body:JSON.stringify({model:"claude-sonnet-5-5",max_tokens:4000,output_config:{effort:"low"},fallbacks:"default",system:"你是熟悉新約聖經、原文與歷史背景的查經同伴。用繁體中文回答，先講結論，再用簡短段落說明；必要時加一段「白話講」。不要說教。",messages:[{role:"user",content:prompt}]})});
+  const j=await r.json();
+  if(j.stop_reason==="refusal"){out.textContent="這個問題沒有得到回答，換個問法試試。";return}
+  out.textContent=j.content?j.content.filter(x=>x.type==="text").map(x=>x.text).join(""):"錯誤："+(j.error?.message||r.status)}catch(e){out.textContent="連線失敗："+e.message}
 }
 
 /* ---------- plan ---------- */
@@ -203,26 +205,34 @@ async function renderNotes(){
 }
 
 /* ---------- people ---------- */
-let person=0,pbook=null,counts=null;
-async function countAll(){
- if(counts)return counts;
- const all=await Promise.all(BOOKS.map((_,i)=>getBook(i)));
- counts=PEOPLE.map(p=>{const re=new RegExp(p.a.join("|"),"g");return all.map((bk,i)=>p.only&&!p.only.includes(i)?bk.map(()=>0):bk.map(ch=>ch.reduce((s,v)=>s+((v[1].match(re)||[]).length),0)))});
- return counts;
+let person=0,pbook=null,customP=null;const countCache={};
+const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+const curP=()=>person<0?customP:PEOPLE[person];
+const pRe=(p,f)=>new RegExp(p.a.map(reEsc).join("|"),f);
+async function countFor(p){
+ const k=p.n+"|"+p.a.join(",");if(countCache[k])return countCache[k];
+ const all=await Promise.all(BOOKS.map((_,i)=>getBook(i)));const re=pRe(p,"g");
+ return countCache[k]=all.map((bk,i)=>p.only&&!p.only.includes(i)?bk.map(()=>0):bk.map(ch=>ch.reduce((s,v)=>s+((v[1].match(re)||[]).length),0)));
+}
+function searchPerson(q){
+ q=q.trim();if(!q)return;
+ const i=PEOPLE.findIndex(x=>x.n===q||x.a.includes(q));
+ if(i>=0){person=i}else{person=-1;customP={n:q,a:[q],d:"",r:[]}}
+ pbook=null;renderPeople();
 }
 async function renderPeople(){
- const p=PEOPLE[person];
+ const p=curP();
  let groups="",lg="";PEOPLE.forEach((x,i)=>{if(x.g!=lg){groups+=`<div class="pg">${x.g}</div>`;lg=x.g}groups+=`<button data-person="${i}" class="${i==person?"on":""}">${x.n}</button>`});
- $("main").innerHTML=`<div class="page"><div class="people"><div class="plist">${groups}</div><div id="pd"></div></div></div>`;
+ $("main").innerHTML=`<div class="page"><div class="psearch"><input id="psearch" type="search" placeholder="搜尋人名或詞語" value="${person<0?esc(p.n):""}" autocomplete="off"></div><div class="people"><div class="plist">${groups}</div><div id="pd"></div></div></div>`;
  document.querySelector(".plist .on")?.scrollIntoView({block:"nearest",inline:"center"});
- const C=(await countAll())[person];
+ const C=await countFor(p);
  const tot=C.map(b=>b.reduce((s,x)=>s+x,0)),max=Math.max(...tot,1),nb=tot.filter(x=>x).length,sum=tot.reduce((s,x)=>s+x,0);
  const shade=n=>`background:color-mix(in srgb,var(--accent) ${Math.round(14+60*Math.sqrt(n/max))}%,transparent)`;
- let h=`<div class="pname">${p.n}</div><p class="pbio">${esc(p.d)}</p><div class="pstat">${nb} 卷書｜${sum} 次</div><div class="map">`;
+ let h=`<div class="pname">${p.n}</div>${p.d?`<p class="pbio">${esc(p.d)}</p>`:""}<div class="pstat">${nb} 卷書｜${sum} 次</div><div class="map">`;
  GROUPS.forEach(([g,a,z])=>{h+=`<div class="mg"><span>${g}</span><div class="cells">`;for(let i=a;i<z;i++)h+=`<button class="cell ${tot[i]?"hit":""} ${pbook==i?"cur":""}" ${tot[i]?`data-pb="${i}" style="${shade(tot[i])}"`:""}>${BOOKS[i][1]}${tot[i]?`<small>${tot[i]}</small>`:""}</button>`;h+=`</div></div>`});
  h+="</div>";
  if(pbook!=null&&tot[pbook]){
-  const bk=await getBook(pbook),re=new RegExp(p.a.join("|"));
+  const bk=await getBook(pbook),re=pRe(p,"");
   h+=`<div class="sub">${BOOKS[pbook][0]}</div><div class="chap-hits" style="margin-top:0;border-top:0;padding-top:0">`+C[pbook].map((n,ci)=>{if(!n)return"";const v=bk[ci].find(x=>re.test(x[1]));return `<div class="ch" data-pgo="${pbook}.${ci+1}.${v[0]}"><b>${ci+1}:${v[0]}</b><span>${esc(v[1].length>46?v[1].slice(0,46)+"…":v[1])}</span></div>`}).join("")+"</div>";
  }
  if(p.r&&p.r.length)h+=`<div class="sub">關係</div>`+p.r.map(([n,t])=>{const j=PEOPLE.findIndex(x=>x.n==n);return `<div class="rel"><b class="${j>=0?"lnk":""}" ${j>=0?`data-person="${j}"`:""}>${n}</b><span>${esc(t)}</span></div>`}).join("");
@@ -283,7 +293,7 @@ document.addEventListener("click",e=>{
  if(d.v)return go(d.v);
  if(d.go){const [b,c]=d.go.split(".").map(Number);return openChapter(b,c)}
  if(d.goto){const [b,c,n]=d.goto.split(".").map(Number);return openChapter(b,c,{verse:n})}
- if(d.pgo){const [b,c,n]=d.pgo.split(".").map(Number);return openChapter(b,c,{verse:n,mark:new RegExp(PEOPLE[person].a.join("|"),"g")})}
+ if(d.pgo){const [b,c,n]=d.pgo.split(".").map(Number);return openChapter(b,c,{verse:n,mark:pRe(curP(),"g")})}
  if(d.book!=null){pref.b=+d.book;pref.c=1;savePref();return openChapter(+d.book,1)}
  if(t.classList.contains("v"))return pickVerse(+d.n);
  if(d.jump){if(!wide()){mseg="text";renderRead().then(()=>{const el=document.getElementById("v"+d.jump);el?.scrollIntoView({block:"start"});el?.classList.add("flash")})}else{const el=document.getElementById("v"+d.jump);el?.scrollIntoView({block:"start",behavior:"smooth"});el?.classList.add("flash");setTimeout(()=>el?.classList.remove("flash"),1700)}return}
@@ -321,7 +331,8 @@ document.addEventListener("keydown",e=>{
  if(pref.view==="read"&&(e.key==="ArrowRight"||e.key==="ArrowLeft"))document.querySelector(`.chead [data-act="${e.key==="ArrowRight"?"next":"prev"}"]`)?.click();
  if(e.key==="Escape"){closeSheet()}
 });
-document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id?.startsWith("q-"))ask(e.target.id.slice(2))});
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id?.startsWith("q-"))ask(e.target.id.slice(2));if(e.key==="Enter"&&e.target.id==="psearch")searchPerson(e.target.value)});
+document.addEventListener("search",e=>{if(e.target.id==="psearch")searchPerson(e.target.value)},true);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")sync()});
 let lastWide=wide();addEventListener("resize",()=>{if(wide()!==lastWide){lastWide=wide();applyPrefs();render()}});
 
