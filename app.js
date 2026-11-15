@@ -20,7 +20,8 @@ const PLANS=[
  {id:"pet",n:"彼得前書和彼得後書",d:4,b:[20,21]},
 ];
 let PLAN,DAYS,curPlan;
-function setupPlan(){curPlan=PLANS.find(p=>p.id===(store.plan.id||{}).v)||PLANS[0];const ch=ALL.filter(([b])=>curPlan.b.includes(b));DAYS=curPlan.d;
+const NONE={id:"none",n:"無計劃",d:0,b:[]};const noPlan=()=>curPlan.id==="none";
+function setupPlan(){curPlan=(store.plan.id||{}).v==="none"?NONE:(PLANS.find(p=>p.id===(store.plan.id||{}).v)||PLANS[0]);const ch=ALL.filter(([b])=>curPlan.b.includes(b));DAYS=curPlan.d;
  PLAN=Array.from({length:DAYS},(_,d)=>ch.slice(Math.round(d*ch.length/DAYS),Math.round((d+1)*ch.length/DAYS)))}
 
 /* ---------- storage ---------- */
@@ -28,6 +29,7 @@ const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.par
 const todayStr=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 let store=ls.get("br.store",null)||{v:{},read:{},plan:{start:{v:todayStr(),t:0},done:{}}};
 store.v=store.v||{};store.read=store.read||{};store.ai=store.ai||{};store.plan=store.plan||{start:{v:todayStr(),t:0},done:{}};
+store.daily=store.daily||{};if(!store.plan.id)store.plan.id={v:Object.keys(store.read).length?"nt90":"none",t:0};
 setupPlan();
 let pref=ls.get("br.pref",{b:5,c:1,en:false,theme:"auto",fs:19,view:"read",stab:"guide"});
 const savePref=()=>ls.set("br.pref",pref);
@@ -64,12 +66,15 @@ const I={
 };
 const VIEWS=[["read","讀經",I.read],["plan","計畫",I.plan],["notes","筆記",I.notes],["co","共讀",I.people],["settings","設定",I.set]];
 function parseRange(r){const [a,b]=String(r).split(/[-–]/).map(Number);return [a,b||a]}
-function dayIndex(){const s=new Date(store.plan.start.v+"T00:00:00");const d=Math.floor((new Date(todayStr()+"T00:00:00")-s)/864e5);return Math.max(0,Math.min(DAYS-1,d))}
-const dayDone=d=>PLAN[d].every(([b,c])=>isRead(b,c));
+function dayIndex(){if(noPlan())return 0;const s=new Date(store.plan.start.v+"T00:00:00");const d=Math.floor((new Date(todayStr()+"T00:00:00")-s)/864e5);return Math.max(0,Math.min(DAYS-1,d))}
+const dayDone=d=>!!PLAN[d]&&PLAN[d].every(([b,c])=>isRead(b,c));
+const dailyDone=ds=>!!(store.daily[ds]||{}).d;
+const todayDone=()=>noPlan()?dailyDone(todayStr()):dayDone(dayIndex());
+const dstr=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`;
 const chRef=([b,c])=>`${BOOKS[b][0]} ${c}`;
-function todayChip(){const d=dayIndex(),ok=dayDone(d),f=PLAN[d].find(([b,c])=>!isRead(b,c))||PLAN[d][0];
+function todayChip(){if(noPlan())return"";const d=dayIndex(),ok=dayDone(d),f=PLAN[d].find(([b,c])=>!isRead(b,c))||PLAN[d][0];
  return `<button class="today ${ok?"ok":"todo"}" data-go="${f[0]}.${f[1]}"><span>Today:</span> ${dayLabel(d)}</button>`}
-function streak(){let k=dayIndex();if(!dayDone(k))k--;let n=0;while(k>=0&&dayDone(k)){n++;k--}return n}
+function streak(){if(noPlan()){const x=new Date();if(!dailyDone(dstr(x)))x.setDate(x.getDate()-1);let n=0;while(dailyDone(dstr(x))){n++;x.setDate(x.getDate()-1)}return n}let k=dayIndex();if(!dayDone(k))k--;let n=0;while(k>=0&&dayDone(k)){n++;k--}return n}
 function streakChip(){const n=streak();return `<span class="streak ${n?"on":""}">連續完成 ${n} 天</span>`}
 function dayLabel(d){const g=[];PLAN[d].forEach(([b,c])=>{const x=g[g.length-1];if(x&&x.b==b)x.z=c;else g.push({b,a:c,z:c})});return g.map(x=>`${BOOKS[x.b][0]} ${x.a}${x.z!=x.a?"–"+x.z:""}`).join("、")}
 function dayDate(d){const s=new Date(store.plan.start.v+"T00:00:00");s.setDate(s.getDate()+d);return `${s.getMonth()+1}/${s.getDate()}（${"日一二三四五六"[s.getDay()]}）`}
@@ -90,6 +95,7 @@ function shell(){
 }
 function renderRail(){
  const d=dayIndex();
+ if(noPlan())$("#today").innerHTML=`<div class="label">今天</div><button class="toggle ${todayDone()?"on":""}" data-dd="${todayStr()}">${todayDone()?"已完成 ✓":"標記今天完成"}</button>`;else
  $("#today").innerHTML=`<div class="label">第 ${d+1} 天｜共 ${DAYS} 天</div><div class="today-list">${PLAN[d].map(([b,c])=>`<a data-go="${b}.${c}" class="${isRead(b,c)?"read":""}">${BOOKS[b][0]} ${c}</a>`).join("")}</div>`;
  let h="";
  GROUPS.forEach(([g,ids],gi)=>{if(gi==0||gi==5)h+=`<div class="testament">${gi?"新約":"舊約"}</div>`;h+=`<div class="grp">${g}</div>`;for(const i of ids){h+=`<button data-book="${i}" class="${pref.b==i?"on":""}">${BOOKS[i][0]}</button>`;
@@ -250,11 +256,17 @@ function aiHistHTML(){
 
 /* ---------- plan ---------- */
 function renderPlan(){
+ const pick=`<select id="planpick" style="width:auto"><option value="none" ${noPlan()?"selected":""}>無計劃</option>${PLANS.map(p=>`<option value="${p.id}" ${p.id==curPlan.id?"selected":""}>${esc(p.n)}｜${p.d} 天</option>`).join("")}</select>`;
+ if(noPlan()){const t=todayDone();const days=Array.from({length:30},(_,k)=>{const x=new Date();x.setDate(x.getDate()-k);return x});
+  $("main").innerHTML=`<div class="page"><div class="phead"><h1>無計劃<small>${streakChip()}</small></h1></div>
+  <div class="todaypanel ${t?"ok":"todo"}"><div class="tp-h"><b>Today:</b> ${t?"已完成":"還沒完成"}<span class="sp"></span><button class="btn ${t?"ghost":""}" data-dd="${todayStr()}">${t?"取消完成":"今天讀完了"}</button></div></div>
+  <div class="row" style="margin-bottom:18px">${pick}</div>
+  <div class="days">${days.map((x,k)=>{const ds=dstr(x),ok=dailyDone(ds);return `<div class="day ${k==0?"today":""} ${ok?"done":""}"><span class="no">${x.getMonth()+1}/${x.getDate()}</span><span class="rd" style="cursor:default">${k==0?"今天":k==1?"昨天":"（"+"日一二三四五六"[x.getDay()]+"）"}</span><button class="chk ${ok?"on":""}" data-dd="${ds}">${ok?I.ok:""}</button></div>`}).join("")}</div></div>`;return}
  const td=dayIndex(),done=PLAN.filter((_,d)=>dayDone(d)).length;
  $("main").innerHTML=`<div class="page"><div class="phead"><h1>${esc(curPlan.n)}<small>${done} / ${DAYS}</small></h1>
  <div class="progress"><i style="width:${done/DAYS*100}%"></i></div></div>
  <div class="todaypanel ${dayDone(td)?"ok":"todo"}"><div class="tp-h"><b>Today:</b> ${dayLabel(td)}<span class="sp"></span>${streakChip()}</div><div class="tp-l">${PLAN[td].map(([b,c])=>`<a data-go="${b}.${c}" class="${isRead(b,c)?"read":""}">${BOOKS[b][0]} ${c}</a>`).join("")}</div></div>
- <div class="row" style="margin-bottom:18px"><select id="planpick" style="width:auto">${PLANS.map(p=>`<option value="${p.id}" ${p.id==curPlan.id?"selected":""}>${esc(p.n)}｜${p.d} 天</option>`).join("")}</select><span class="label" style="margin:0 0 0 8px">開始日期</span><input type="date" id="start" value="${store.plan.start.v}"></div>
+ <div class="row" style="margin-bottom:18px">${pick}<span class="label" style="margin:0 0 0 8px">開始日期</span><input type="date" id="start" value="${store.plan.start.v}"></div>
  <div class="days">${PLAN.map((p,d)=>`<div class="day ${d==td?"today":""} ${dayDone(d)?"done":""}" id="day${d}"><span class="no">${String(d+1).padStart(2,"0")}</span><span class="rd" data-go="${p[0][0]}.${p[0][1]}">${dayLabel(d)}<span class="dt">${dayDate(d)}</span></span><button class="chk ${dayDone(d)?"on":""}" data-day="${d}">${dayDone(d)?I.ok:""}</button></div>`).join("")}</div></div>`;
  document.getElementById("day"+td)?.scrollIntoView({block:"center"});
 }
@@ -322,7 +334,7 @@ async function renderPeople(){
 const rid=n=>Array.from(crypto.getRandomValues(new Uint8Array(n)),x=>"abcdefghjkmnpqrstuvwxyz23456789"[x%31]).join("");
 function myId(){if(!store.me){store.me={id:rid(16),secret:rid(32),name:"",t:now()};saveStore()}return store.me}
 async function coApi(action,extra={}){const m=myId();const r=await fetch(RELAY+"/co/"+action,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:m.id,secret:m.secret,...extra})});return r.json()}
-function coStatus(){const d=dayIndex(),done=PLAN.filter((_,x)=>dayDone(x)).length;return{plan:curPlan.n,day:d+1,days:DAYS,today:dayLabel(d),ok:dayDone(d),streak:streak(),pct:Math.round(done/DAYS*100)}}
+function coStatus(){if(noPlan())return{plan:"無計劃",day:0,days:0,today:"",ok:todayDone(),streak:streak(),pct:0};const d=dayIndex(),done=PLAN.filter((_,x)=>dayDone(x)).length;return{plan:curPlan.n,day:d+1,days:DAYS,today:dayLabel(d),ok:dayDone(d),streak:streak(),pct:Math.round(done/DAYS*100)}}
 let pushT=null;function pushStatus(){if(!store.me?.name||!navigator.onLine)return;clearTimeout(pushT);pushT=setTimeout(()=>coApi("me",{st:coStatus()}).catch(()=>{}),2000)}
 let coJoin="",coCache=null;
 async function renderCo(){
@@ -330,8 +342,8 @@ async function renderCo(){
  if(!m||!m.name){$("main").innerHTML=`<div class="page"><div class="phead"><h1>共讀</h1></div>
   <div class="co-start"><p>取一個朋友認得出來的暱稱。</p><div class="ask"><input id="coname" maxlength="20" placeholder="暱稱"><button class="btn" data-act="coname">開始</button></div><div class="status" id="cost"></div></div></div>`;return}
  const card=g=>`<section class="cog"><div class="cog-h"><h2>${esc(g.name)}</h2><button class="linkbtn" data-coren="${g.gid}" data-coname="${esc(g.name)}">改名</button><span class="sp"></span><span class="cog-n">${g.members.length} / 6</span></div>
-  <div class="cog-m">${g.members.map(x=>{const st=x.st;return `<div class="com ${st?(st.ok?"ok":"todo"):""}"><div class="com-a">${x.avatar?`<img src="${x.avatar}" alt="">`:esc((x.name||"?").slice(0,1))}</div><div class="com-b"><div class="com-n">${esc(x.name)}${x.me?"<small>（我）</small>":""}</div>
-   ${st?`<div class="com-t"><b>Today:</b> ${esc(st.today)}</div><div class="com-p">${esc(st.plan)}｜第 ${st.day} / ${st.days} 天｜連續 ${st.streak} 天</div><div class="com-bar"><i style="width:${st.pct}%"></i></div>`:`<div class="com-p">還沒有進度</div>`}</div></div>`}).join("")}</div>
+  <div class="cog-m">${g.members.map(x=>{const st=x.st;return `<div class="com ${st?(st.ok?"ok":"todo"):""}"><div class="com-a">${x.avatar?`<img src="${x.avatar}" alt="">`:esc((x.name||"?").slice(0,1))}</div><div class="com-b"><div class="com-n">${esc(x.name)}${x.me?`<small>（我）</small> <button class="linkbtn" data-act="corename">改暱稱</button>`:""}</div>
+   ${st?(st.days?`<div class="com-t"><b>Today:</b> ${esc(st.today)}</div><div class="com-p">${esc(st.plan)}｜第 ${st.day} / ${st.days} 天｜連續 ${st.streak} 天</div><div class="com-bar"><i style="width:${st.pct}%"></i></div>`:`<div class="com-t"><b>Today:</b> ${st.ok?"已完成":"還沒完成"}</div><div class="com-p">無計劃｜連續 ${st.streak} 天</div>`):`<div class="com-p">還沒有進度</div>`}</div></div>`}).join("")}</div>
   <div class="cog-f"><span class="cog-code">邀請碼 <b>${g.gid}</b></span><button class="btn ghost" data-cocopy="${g.gid}">複製邀請連結</button><button class="linkbtn" data-coleave="${g.gid}">離開</button></div></section>`;
  const draw=(groups,err)=>{$("main").innerHTML=`<div class="page"><div class="phead"><h1>共讀<small>${esc(m.name)}　<button class="linkbtn" data-act="corename">改暱稱</button></small></h1></div>
   ${err?`<p class="status">${esc(err)}</p>`:""}
@@ -376,7 +388,7 @@ function renderSettings(){
 /* ---------- sync (GitHub Gist) ---------- */
 const FILE="bible-reader.json";
 function mergeMap(a={},b={}){const o={...a};for(const k in b)if(!o[k]||(b[k].t||0)>(o[k].t||0))o[k]=b[k];return o}
-function merge(a,b){return{me:((b.me?.t||0)>(a.me?.t||0)?b.me:a.me)||null,v:mergeMap(a.v,b.v),read:mergeMap(a.read,b.read),ai:mergeMap(a.ai,b.ai),plan:{start:(b.plan?.start?.t||0)>(a.plan?.start?.t||0)?b.plan.start:a.plan.start,id:(b.plan?.id?.t||0)>(a.plan?.id?.t||0)?b.plan.id:a.plan?.id,done:{}}}}
+function merge(a,b){return{me:((b.me?.t||0)>(a.me?.t||0)?b.me:a.me)||null,v:mergeMap(a.v,b.v),read:mergeMap(a.read,b.read),ai:mergeMap(a.ai,b.ai),daily:mergeMap(a.daily,b.daily),plan:{start:(b.plan?.start?.t||0)>(a.plan?.start?.t||0)?b.plan.start:a.plan.start,id:(b.plan?.id?.t||0)>(a.plan?.id?.t||0)?b.plan.id:a.plan?.id,done:{}}}}
 let syncing=false;
 async function sync(manual){
  const tok=ls.get("br.gh","");const st=$("#syncst");
@@ -425,6 +437,7 @@ document.addEventListener("click",e=>{
  if(d.pkback)return bookPicker();
  if(d.ask)return ask(d.ask);
  if(d.aidel){const v=store.ai[d.aidel];if(v){store.ai[d.aidel]={...v,del:1,a:"",t:now()};saveStore()}document.querySelectorAll(".aihist").forEach(el=>el.outerHTML=aiHistHTML());if(pref.view==="notes")renderNotes();return}
+ if(d.dd){const ds=d.dd;store.daily[ds]={d:dailyDone(ds)?0:1,t:now()};saveStore();pushStatus();renderRail();if(pref.view==="plan"){const y=scrollY,m=$("main").scrollTop;renderPlan();scrollTo(0,y);$("main").scrollTop=m}return}
  if(d.day!=null){const dd=+d.day,v=!dayDone(dd);PLAN[dd].forEach(([b,c])=>setRead(b,c,v));
   const row=document.getElementById("day"+dd);row.classList.toggle("done",v);t.classList.toggle("on",v);t.innerHTML=v?I.ok:"";
   const done=PLAN.filter((_,x)=>dayDone(x)).length;const sm=document.querySelector(".phead h1 small");if(sm)sm.textContent=`${done} / ${DAYS}`;
@@ -458,7 +471,7 @@ document.addEventListener("input",e=>{
  if(e.target.id==="code")ls.set("br.code",e.target.value.trim());
 });
 document.addEventListener("change",async e=>{
- if(e.target.id==="planpick"){store.plan.id={v:e.target.value,t:now()};setupPlan();saveStore();renderPlan();renderRail()}
+ if(e.target.id==="planpick"){store.plan.id={v:e.target.value,t:now()};setupPlan();saveStore();pushStatus();renderPlan();renderRail()}
  if(e.target.id==="start"&&e.target.value){store.plan.start={v:e.target.value,t:now()};saveStore();renderPlan();renderRail()}
  if(e.target.id==="avatar"){const f=e.target.files[0];if(!f)return;const st=$("#avst");st.textContent="處理中…";
   try{const url=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
@@ -488,7 +501,7 @@ document.addEventListener("pointerdown",e=>{if(e.target.closest("#selbar"))e.pre
 addEventListener("scroll",()=>{if(!$("#selbar").hidden)showSelbar()},true);
 let lastWide=wide();addEventListener("resize",()=>{if(wide()!==lastWide){lastWide=wide();applyPrefs();render()}});
 
-(()=>{const d=dayIndex();if(dayDone(d))return;const f=PLAN[d].find(([b,c])=>!isRead(b,c));if(f){pref.b=f[0];pref.c=f[1];pref.view="read";savePref()}})();
+(()=>{if(noPlan())return;const d=dayIndex();if(dayDone(d))return;const f=PLAN[d].find(([b,c])=>!isRead(b,c));if(f){pref.b=f[0];pref.c=f[1];pref.view="read";savePref()}})();
 if(location.hash.startsWith("#join-")){coJoin=location.hash.slice(6);pref.view="co";savePref();history.replaceState(null,"",location.pathname)}
 applyPrefs();render();sync();pushStatus();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js");
