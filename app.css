@@ -244,10 +244,16 @@ main{min-width:0;overflow:auto;position:relative}
   .psearch{position:sticky;top:0;z-index:5;background:var(--bg);margin:-20px -18px 0;padding:14px 18px 10px}
   .plist{position:sticky;top:62px;z-index:4;background:var(--bg)}
   input,textarea,select{font-size:16px}
-  .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-  .tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 6px;font-size:11px;font-weight:800;color:var(--faint)}
-  .tabbar button svg{width:22px;height:22px}
-  .tabbar button[aria-current]{color:var(--ink)}
+  .tabbar{display:flex;position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:40;padding:5px;border-radius:30px;
+    background:color-mix(in srgb,var(--bg) 82%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.6);backdrop-filter:blur(18px) saturate(1.6);
+    border:1px solid var(--line);box-shadow:0 8px 28px rgba(18,19,34,.14)}
+  .tabbar .pill{position:absolute;top:5px;bottom:5px;left:5px;width:calc((100% - 10px)/5);border-radius:24px;background:var(--accent-soft);
+    transform:translateX(calc(var(--i,0) * 100%));transition:transform .42s cubic-bezier(.34,1.45,.5,1)}
+  .tabbar button{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 0 6px;font-size:11px;font-weight:800;color:var(--muted);transition:color .25s}
+  .tabbar button svg{width:22px;height:22px;transition:transform .35s cubic-bezier(.34,1.45,.5,1)}
+  .tabbar button[aria-current]{color:var(--accent-ink)}
+  .tabbar button[aria-current] svg{transform:translateY(-1px) scale(1.08)}
+  main{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
   .people{grid-template-columns:1fr;gap:16px}
   .plist{display:flex;overflow-x:auto;gap:18px;border-bottom:1px solid var(--line);scrollbar-width:none;margin:0 -18px;padding:0 18px}
   .plist .pg{display:none}
@@ -272,3 +278,13 @@ main{min-width:0;overflow:auto;position:relative}
 .aidt{font-size:12px;color:var(--faint);margin-top:4px}
 .aidel{color:var(--faint);font-size:18px;line-height:1;padding:0 4px}
 .aidel:hover{color:var(--ink)}
+
+.today{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:800;padding:3px 10px;border-radius:14px;white-space:nowrap;align-self:center}
+.today span{font-size:11px;opacity:.8}
+.today.todo{color:#C2342B;background:rgba(214,58,48,.10)}
+.today.ok{color:#17824E;background:rgba(30,160,95,.12)}
+:root[data-theme="dark"] .today.todo{color:#F2847C}:root[data-theme="dark"] .today.ok{color:#5FD69A}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .today.todo{color:#F2847C}:root:not([data-theme="light"]) .today.ok{color:#5FD69A}}
+.mseg{align-items:center}.mseg .sp{flex:1}.mseg .today{margin-bottom:6px}
+@media (prefers-reduced-motion:reduce){.tabbar .pill,.tabbar button svg{transition:none}}
+.mseg .today{max-width:62%;overflow:hidden;text-overflow:ellipsis}

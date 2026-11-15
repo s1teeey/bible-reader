@@ -66,7 +66,9 @@ function parseRange(r){const [a,b]=String(r).split(/[-–]/).map(Number);return 
 function dayIndex(){const s=new Date(store.plan.start.v+"T00:00:00");const d=Math.floor((new Date(todayStr()+"T00:00:00")-s)/864e5);return Math.max(0,Math.min(DAYS-1,d))}
 const dayDone=d=>PLAN[d].every(([b,c])=>isRead(b,c));
 const chRef=([b,c])=>`${BOOKS[b][0]} ${c}`;
-function dayLabel(d){const p=PLAN[d];const f=p[0],l=p[p.length-1];return f[0]==l[0]?`${BOOKS[f[0]][0]} ${f[1]}–${l[1]}`.replace(/ (\d+)–\1$/," $1"):p.map(chRef).join("、")}
+function todayChip(){const d=dayIndex(),ok=dayDone(d),f=PLAN[d].find(([b,c])=>!isRead(b,c))||PLAN[d][0];
+ return `<button class="today ${ok?"ok":"todo"}" data-go="${f[0]}.${f[1]}"><span>今日</span>${dayLabel(d)}${ok?" ✓":""}</button>`}
+function dayLabel(d){const g=[];PLAN[d].forEach(([b,c])=>{const x=g[g.length-1];if(x&&x.b==b)x.z=c;else g.push({b,a:c,z:c})});return g.map(x=>`${BOOKS[x.b][0]} ${x.a}${x.z!=x.a?"–"+x.z:""}`).join("、")}
 function dayDate(d){const s=new Date(store.plan.start.v+"T00:00:00");s.setDate(s.getDate()+d);return `${s.getMonth()+1}/${s.getDate()}（${"日一二三四五六"[s.getDay()]}）`}
 
 /* ---------- theme ---------- */
@@ -79,7 +81,8 @@ function applyPrefs(){
 let sel=null,markRe=null,mseg="text",curText=null,curGuide=null;
 function shell(){
  $("#nav").innerHTML=VIEWS.map(([k,t])=>`<button data-v="${k}" ${pref.view==k?'aria-current="page"':""}>${t}</button>`).join("");
- $("#tabbar").innerHTML=VIEWS.map(([k,t,ic])=>`<button data-v="${k}" ${pref.view==k?'aria-current="page"':""}>${ic}${t}</button>`).join("");
+ const tb=$("#tabbar");if(!tb.firstChild)tb.innerHTML=`<i class="pill"></i>`+VIEWS.map(([k,t,ic])=>`<button data-v="${k}">${ic}<span>${t}</span></button>`).join("");
+ const vi=VIEWS.findIndex(v=>v[0]==pref.view);tb.style.setProperty("--i",vi);tb.querySelectorAll("button").forEach((x,i)=>i==vi?x.setAttribute("aria-current","page"):x.removeAttribute("aria-current"));
  renderRail();
 }
 function renderRail(){
@@ -121,10 +124,10 @@ async function renderRead(){
  const prev=ALL.findIndex(([x,y])=>x==b&&y==c);
  const P=ALL[prev-1],N=ALL[prev+1];
  $("main").innerHTML=`<div class="reader">
-  <div class="rhead"><div class="chead"><h1>${BOOKS[b][0]} ${c}</h1><span class="sp"></span>
+  <div class="rhead"><div class="chead"><h1>${BOOKS[b][0]} ${c}</h1>${todayChip()}<span class="sp"></span>
    <button class="toggle ${pref.en?"on":""}" data-act="en">EN</button>
    <button class="iconbtn" data-act="prev" ${P?"":"disabled"}>${I.l}</button><button class="iconbtn" data-act="next" ${N?"":"disabled"}>${I.r}</button></div>
-  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button></div></div>
+  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button><span class="sp"></span>${todayChip()}</div></div>
   ${mseg=="guide"&&!wide()?`<div class="guide">${guideHTML()}</div>`:`<div class="text">${verses}</div>`}
   <div class="pager"><button data-act="prev" ${P?"":"hidden"}>← ${P?chRef(P):""}</button>
    <button data-act="next" class="${N?"":"done"}">${isRead(b,c)?"":"讀完，"}${N?chRef(N)+" →":"完成"}</button></div>
@@ -395,5 +398,6 @@ document.addEventListener("touchend",e=>{if(tx==null)return;const dx=e.changedTo
  if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.5)return;const n=dx<0?"guide":"text";if(n===mseg)return;mseg=n;renderRead().then(()=>window.scrollTo(0,0))},{passive:true});
 let lastWide=wide();addEventListener("resize",()=>{if(wide()!==lastWide){lastWide=wide();applyPrefs();render()}});
 
+(()=>{const d=dayIndex();if(dayDone(d))return;const f=PLAN[d].find(([b,c])=>!isRead(b,c));if(f){pref.b=f[0];pref.c=f[1];pref.view="read";savePref()}})();
 applyPrefs();render();sync();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js");
