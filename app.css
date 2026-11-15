@@ -339,3 +339,5 @@ main{min-width:0;overflow:auto;position:relative}
 .cog-code{font-size:13px;color:var(--muted);flex:1}.cog-code b{color:var(--ink);letter-spacing:.04em}
 .co-new{margin-top:8px}
 .brand-zh{font-weight:700;color:var(--faint);font-size:13px;margin-left:2px}
+.testament{font-size:13px;font-weight:900;color:var(--ink);margin:18px 0 0;padding-top:10px;border-top:2px solid var(--rule)}
+.testament:first-child{margin-top:4px;border-top:0;padding-top:0}

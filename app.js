@@ -1,10 +1,11 @@
 "use strict";
 const RELAY="https://bible-reader-ai.ju4t4r1.workers.dev";
 /* ---------- data ---------- */
-const BOOKS=[["馬太福音","太",28],["馬可福音","可",16],["路加福音","路",24],["約翰福音","約",21],["使徒行傳","徒",28],["羅馬書","羅",16],["哥林多前書","林前",16],["哥林多後書","林後",13],["加拉太書","加",6],["以弗所書","弗",6],["腓立比書","腓",4],["歌羅西書","西",4],["帖撒羅尼迦前書","帖前",5],["帖撒羅尼迦後書","帖後",3],["提摩太前書","提前",6],["提摩太後書","提後",4],["提多書","多",3],["腓利門書","門",1],["希伯來書","來",13],["雅各書","雅",5],["彼得前書","彼前",5],["彼得後書","彼後",3],["約翰一書","約壹",5],["約翰二書","約貳",1],["約翰三書","約參",1],["猶大書","猶",1],["啟示錄","啟",22]];
-const GROUPS=[["福音書",0,4],["歷史",4,5],["保羅書信",5,18],["普通書信",18,26],["預言",26,27]];
+const BOOKS=[["馬太福音","太",28],["馬可福音","可",16],["路加福音","路",24],["約翰福音","約",21],["使徒行傳","徒",28],["羅馬書","羅",16],["哥林多前書","林前",16],["哥林多後書","林後",13],["加拉太書","加",6],["以弗所書","弗",6],["腓立比書","腓",4],["歌羅西書","西",4],["帖撒羅尼迦前書","帖前",5],["帖撒羅尼迦後書","帖後",3],["提摩太前書","提前",6],["提摩太後書","提後",4],["提多書","多",3],["腓利門書","門",1],["希伯來書","來",13],["雅各書","雅",5],["彼得前書","彼前",5],["彼得後書","彼後",3],["約翰一書","約壹",5],["約翰二書","約貳",1],["約翰三書","約參",1],["猶大書","猶",1],["啟示錄","啟",22],["創世記","創",50],["出埃及記","出",40],["利未記","利",27],["民數記","民",36],["申命記","申",34],["約書亞記","書",24],["士師記","士",21],["路得記","得",4],["撒母耳記上","撒上",31],["撒母耳記下","撒下",24],["列王紀上","王上",22],["列王紀下","王下",25],["歷代志上","代上",29],["歷代志下","代下",36],["以斯拉記","拉",10],["尼希米記","尼",13],["以斯帖記","斯",10],["約伯記","伯",42],["詩篇","詩",150],["箴言","箴",31],["傳道書","傳",12],["雅歌","歌",8],["以賽亞書","賽",66],["耶利米書","耶",52],["耶利米哀歌","哀",5],["以西結書","結",48],["但以理書","但",12],["何西阿書","何",14],["約珥書","珥",3],["阿摩司書","摩",9],["俄巴底亞書","俄",1],["約拿書","拿",4],["彌迦書","彌",7],["那鴻書","鴻",3],["哈巴谷書","哈",3],["西番雅書","番",3],["哈該書","該",2],["撒迦利亞書","亞",14],["瑪拉基書","瑪",4]];
+const GROUPS=[["律法書",[27,28,29,30,31]],["歷史書",[32,33,34,35,36,37,38,39,40,41,42,43]],["詩歌智慧書",[44,45,46,47,48]],["大先知書",[49,50,51,52,53]],["小先知書",[54,55,56,57,58,59,60,61,62,63,64,65]],["福音書",[0,1,2,3]],["使徒行傳",[4]],["保羅書信",[5,6,7,8,9,10,11,12,13,14,15,16,17]],["普通書信",[18,19,20,21,22,23,24,25]],["啟示錄",[26]]];
+const ORDER=GROUPS.flatMap(g=>g[1]);
 const COLORS=["y","g","b","p"];
-const ALL=[];BOOKS.forEach((b,i)=>{for(let c=1;c<=b[2];c++)ALL.push([i,c])});
+const ALL=[];ORDER.forEach(i=>{for(let c=1;c<=BOOKS[i][2];c++)ALL.push([i,c])});
 const rng=(a,z)=>Array.from({length:z-a+1},(_,i)=>a+i);
 const PLANS=[
  {id:"nt90",n:"90 天讀完新約全書",d:90,b:rng(0,26)},
@@ -91,7 +92,7 @@ function renderRail(){
  const d=dayIndex();
  $("#today").innerHTML=`<div class="label">第 ${d+1} 天｜共 ${DAYS} 天</div><div class="today-list">${PLAN[d].map(([b,c])=>`<a data-go="${b}.${c}" class="${isRead(b,c)?"read":""}">${BOOKS[b][0]} ${c}</a>`).join("")}</div>`;
  let h="";
- GROUPS.forEach(([g,a,z])=>{h+=`<div class="grp">${g}</div>`;for(let i=a;i<z;i++){h+=`<button data-book="${i}" class="${pref.b==i?"on":""}">${BOOKS[i][0]}</button>`;
+ GROUPS.forEach(([g,ids],gi)=>{if(gi==0||gi==5)h+=`<div class="testament">${gi?"新約":"舊約"}</div>`;h+=`<div class="grp">${g}</div>`;for(const i of ids){h+=`<button data-book="${i}" class="${pref.b==i?"on":""}">${BOOKS[i][0]}</button>`;
   if(pref.b==i&&pref.view=="read")h+=`<div class="chips">${Array.from({length:BOOKS[i][2]},(_,k)=>`<button data-go="${i}.${k+1}" class="${pref.c==k+1?"on":""}" title="${isRead(i,k+1)?"已讀":""}">${k+1}</button>`).join("")}</div>`}});
  $("#books").innerHTML=h;
  const on=$("#books .chips .on");if(on&&!renderRail.did){on.scrollIntoView({block:"center"});renderRail.did=1}
@@ -208,7 +209,7 @@ function refreshVerse(n){const el=document.getElementById("v"+n);if(!el)return;c
 function openSheet(html){$("#sheetbg").hidden=false;const s=$("#sheet");s.hidden=false;s.innerHTML=`<div class="grab"></div>`+html}
 function closeSheet(){$("#sheetbg").hidden=true;$("#sheet").hidden=true}
 function bookPicker(){
- let h="";GROUPS.forEach(([g,a,z])=>{h+=`<div class="label" style="margin-top:14px">${g}</div>`;for(let i=a;i<z;i++)h+=`<div style="display:grid;grid-template-columns:96px 1fr;gap:8px;align-items:start;border-bottom:1px solid var(--line);padding:6px 0"><b style="padding-top:2px;font-size:14px">${BOOKS[i][0]}</b><div class="chips" style="margin:0">${Array.from({length:BOOKS[i][2]},(_,k)=>`<button data-go="${i}.${k+1}" class="${pref.b==i&&pref.c==k+1?"on":""}">${k+1}</button>`).join("")}</div></div>`});
+ let h="";GROUPS.forEach(([g,ids])=>{h+=`<div class="label" style="margin-top:14px">${g}</div>`;for(const i of ids)h+=`<div style="display:grid;grid-template-columns:96px 1fr;gap:8px;align-items:start;border-bottom:1px solid var(--line);padding:6px 0"><b style="padding-top:2px;font-size:14px">${BOOKS[i][0]}</b><div class="chips" style="margin:0">${Array.from({length:BOOKS[i][2]},(_,k)=>`<button data-go="${i}.${k+1}" class="${pref.b==i&&pref.c==k+1?"on":""}">${k+1}</button>`).join("")}</div></div>`});
  openSheet(h);
 }
 
@@ -306,7 +307,7 @@ async function renderPeople(){
  const tot=C.map(b=>b.reduce((s,x)=>s+x,0)),max=Math.max(...tot,1),nb=tot.filter(x=>x).length,sum=tot.reduce((s,x)=>s+x,0);
  const shade=n=>`background:color-mix(in srgb,var(--accent) ${Math.round(14+60*Math.sqrt(n/max))}%,transparent)`;
  let h=`<div class="pname">${p.n}</div>${p.d?`<p class="pbio">${esc(p.d)}</p>`:""}<div class="pstat">${nb} 卷書｜${sum} 次</div><div class="map">`;
- GROUPS.forEach(([g,a,z])=>{h+=`<div class="mg"><span>${g}</span><div class="cells">`;for(let i=a;i<z;i++)h+=`<button class="cell ${tot[i]?"hit":""} ${pbook==i?"cur":""}" ${tot[i]?`data-pb="${i}" style="${shade(tot[i])}"`:""}>${BOOKS[i][1]}${tot[i]?`<small>${tot[i]}</small>`:""}</button>`;h+=`</div></div>`});
+ GROUPS.forEach(([g,ids])=>{h+=`<div class="mg"><span>${g}</span><div class="cells">`;for(const i of ids)h+=`<button class="cell ${tot[i]?"hit":""} ${pbook==i?"cur":""}" ${tot[i]?`data-pb="${i}" style="${shade(tot[i])}"`:""}>${BOOKS[i][1]}${tot[i]?`<small>${tot[i]}</small>`:""}</button>`;h+=`</div></div>`});
  h+="</div>";
  if(pbook!=null&&tot[pbook]){
   const bk=await getBook(pbook),re=pRe(p,"");
