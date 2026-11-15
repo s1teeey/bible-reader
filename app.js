@@ -506,3 +506,9 @@ let lastWide=wide();addEventListener("resize",()=>{if(wide()!==lastWide){lastWid
 if(location.hash.startsWith("#join-")){coJoin=location.hash.slice(6);pref.view="co";savePref();history.replaceState(null,"",location.pathname)}
 applyPrefs();render();sync();pushStatus();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js");
+const APPV=(document.querySelector('script[src^="app.js"]')?.getAttribute("src").match(/v=(\d+)/)||[])[1];
+let updShown=false;
+async function checkUpdate(){if(updShown||!APPV||!navigator.onLine||!location.protocol.startsWith("http"))return;
+ try{const t=await (await fetch("./?u="+Date.now(),{cache:"no-store"})).text();const v=(t.match(/app\.js\?v=(\d+)/)||[])[1];
+  if(v&&v!==APPV){updShown=true;const b=document.createElement("button");b.className="updbar";b.textContent="有新版本，點此更新";b.onclick=async()=>{b.textContent="更新中…";try{const r=await navigator.serviceWorker?.getRegistration();await r?.update()}catch(e){}location.reload()};document.body.appendChild(b)}}catch(e){}}
+setTimeout(checkUpdate,3000);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")checkUpdate()});
