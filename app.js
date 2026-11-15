@@ -208,9 +208,10 @@ function refreshVerse(n){const el=document.getElementById("v"+n);if(!el)return;c
 /* ---------- sheet ---------- */
 function openSheet(html){$("#sheetbg").hidden=false;const s=$("#sheet");s.hidden=false;s.innerHTML=`<div class="grab"></div>`+html}
 function closeSheet(){$("#sheetbg").hidden=true;$("#sheet").hidden=true}
-function bookPicker(){
- let h="";GROUPS.forEach(([g,ids])=>{h+=`<div class="label" style="margin-top:14px">${g}</div>`;for(const i of ids)h+=`<div style="display:grid;grid-template-columns:96px 1fr;gap:8px;align-items:start;border-bottom:1px solid var(--line);padding:6px 0"><b style="padding-top:2px;font-size:14px">${BOOKS[i][0]}</b><div class="chips" style="margin:0">${Array.from({length:BOOKS[i][2]},(_,k)=>`<button data-go="${i}.${k+1}" class="${pref.b==i&&pref.c==k+1?"on":""}">${k+1}</button>`).join("")}</div></div>`});
- openSheet(h);
+function bookPicker(b){
+ if(b==null){let h="";GROUPS.forEach(([g,ids],gi)=>{if(gi==0||gi==5)h+=`<div class="pk-t">${gi?"新約":"舊約"}</div>`;h+=`<div class="label" style="margin-top:12px">${g}</div><div class="pk-grid">${ids.map(i=>`<button class="pk-b ${pref.b==i?"on":""}" data-pkb="${i}"><b>${BOOKS[i][1]}</b><span>${BOOKS[i][0]}</span></button>`).join("")}</div>`});
+  openSheet(h);const on=$("#sheet .pk-b.on");if(on)on.scrollIntoView({block:"center"});return}
+ openSheet(`<div class="pk-h"><button class="linkbtn" data-pkback="1">← 書卷</button><b>${BOOKS[b][0]}</b></div><div class="pk-ch">${Array.from({length:BOOKS[b][2]},(_,k)=>`<button data-go="${b}.${k+1}" class="${pref.b==b&&pref.c==k+1?"on":""} ${isRead(b,k+1)?"rd":""}">${k+1}</button>`).join("")}</div>`);
 }
 
 /* ---------- AI ---------- */
@@ -329,7 +330,7 @@ async function renderCo(){
  if(!m||!m.name){$("main").innerHTML=`<div class="page"><div class="phead"><h1>共讀</h1></div>
   <div class="co-start"><p>取一個朋友認得出來的暱稱。</p><div class="ask"><input id="coname" maxlength="20" placeholder="暱稱"><button class="btn" data-act="coname">開始</button></div><div class="status" id="cost"></div></div></div>`;return}
  const card=g=>`<section class="cog"><div class="cog-h"><h2>${esc(g.name)}</h2><span class="sp"></span><span class="cog-n">${g.members.length} / 6</span></div>
-  <div class="cog-m">${g.members.map(x=>{const st=x.st;return `<div class="com ${st?(st.ok?"ok":"todo"):""}"><div class="com-a">${esc((x.name||"?").slice(0,1))}</div><div class="com-b"><div class="com-n">${esc(x.name)}${x.me?"<small>（我）</small>":""}</div>
+  <div class="cog-m">${g.members.map(x=>{const st=x.st;return `<div class="com ${st?(st.ok?"ok":"todo"):""}"><div class="com-a">${x.avatar?`<img src="${x.avatar}" alt="">`:esc((x.name||"?").slice(0,1))}</div><div class="com-b"><div class="com-n">${esc(x.name)}${x.me?"<small>（我）</small>":""}</div>
    ${st?`<div class="com-t"><b>Today:</b> ${esc(st.today)}</div><div class="com-p">${esc(st.plan)}｜第 ${st.day} / ${st.days} 天｜連續 ${st.streak} 天</div><div class="com-bar"><i style="width:${st.pct}%"></i></div>`:`<div class="com-p">還沒有進度</div>`}</div></div>`}).join("")}</div>
   <div class="cog-f"><span class="cog-code">邀請碼 <b>${g.gid}</b></span><button class="btn ghost" data-cocopy="${g.gid}">複製邀請連結</button><button class="linkbtn" data-coleave="${g.gid}">離開</button></div></section>`;
  const draw=(groups,err)=>{$("main").innerHTML=`<div class="page"><div class="phead"><h1>共讀<small>${esc(m.name)}　<button class="linkbtn" data-act="corename">改暱稱</button></small></h1></div>
@@ -344,7 +345,7 @@ async function renderCo(){
 async function coAction(a,t){const st=()=>$("#cost");
  try{
   if(a=="coname"||a=="corename"){const n=a=="coname"?$("#coname").value.trim():(prompt("新暱稱",store.me.name)||"").trim();if(!n)return;
-   myId();store.me={...store.me,name:n.slice(0,20),t:now()};saveStore();const j=await coApi("me",{name:store.me.name,st:coStatus()});if(j.error)return st()&&(st().textContent=j.error);return renderCo()}
+   myId();store.me={...store.me,name:n.slice(0,20),t:now()};saveStore();const j=await coApi("me",{name:store.me.name,st:coStatus(),avatar:store.me.avatar||""});if(j.error)return st()&&(st().textContent=j.error);return renderCo()}
   if(a=="cojoin"){const code=$("#cojoin").value.trim().replace(/^.*#join-/,"");if(!code)return;st().textContent="…";const j=await coApi("join",{gid:code});if(j.error)return st().textContent=j.error;coJoin="";pushStatus();return renderCo()}
   if(a=="cocreate"){const n=$("#cocreate").value.trim();st().textContent="…";const j=await coApi("create",{name:n});if(j.error)return st().textContent=j.error;pushStatus();return renderCo()}
  }catch(e){st()&&(st().textContent="連線失敗："+e.message)}
@@ -354,6 +355,7 @@ async function coAction(a,t){const st=()=>$("#cost");
 function renderSettings(){
  const tok=ls.get("br.gh",""),last=ls.get("br.synced",0);
  $("main").innerHTML=`<div class="page set"><h1>設定</h1>
+ <div class="grp"><h3>頭像</h3><div class="row"><div class="av-prev">${store.me?.avatar?`<img src="${store.me.avatar}" alt="">`:esc((store.me?.name||"?").slice(0,1))}</div><label class="btn ghost" style="cursor:pointer">上傳照片<input type="file" id="avatar" accept="image/*" hidden></label>${store.me?.avatar?'<button class="linkbtn" data-act="avclear">移除</button>':""}</div><div class="status" id="avst"></div></div>
  <div class="grp"><h3>人物 <span class="beta">Beta 實驗性功能</span></h3><button class="btn ghost" data-v="people">打開人物</button></div>
  <div class="grp"><h3>外觀</h3><div class="seg">${[["auto","跟隨系統"],["light","淺色"],["dark","深色"]].map(([k,t])=>`<button data-theme="${k}" class="${pref.theme==k?"on":""}">${t}</button>`).join("")}</div></div>
  <div class="grp"><h3>字級</h3><div class="seg">${[[17,"小"],[19,"中"],[21,"大"],[23,"特大"]].map(([k,t])=>`<button data-fs="${k}" class="${pref.fs==k?"on":""}">${t}</button>`).join("")}</div></div>
@@ -419,6 +421,8 @@ document.addEventListener("click",e=>{
  if(d.pr!=null)return applyPartial(d.pr);
  if(d.poster){const lb=$("#lightbox");lb.hidden=false;lb.innerHTML=`<img src="${BP}tr:w-2400/${d.poster}" alt=""><a href="${BP}${d.poster}" target="_blank" rel="noopener">開啟原圖</a><button class="lbx" data-lbclose="1" aria-label="關閉">×</button>`;return}
  if(d.lbclose||t.id==="lightbox"){$("#lightbox").hidden=true;return}
+ if(d.pkb!=null)return bookPicker(+d.pkb);
+ if(d.pkback)return bookPicker();
  if(d.ask)return ask(d.ask);
  if(d.aidel){const v=store.ai[d.aidel];if(v){store.ai[d.aidel]={...v,del:1,a:"",t:now()};saveStore()}document.querySelectorAll(".aihist").forEach(el=>el.outerHTML=aiHistHTML());if(pref.view==="notes")renderNotes();return}
  if(d.day!=null){const dd=+d.day,v=!dayDone(dd);PLAN[dd].forEach(([b,c])=>setRead(b,c,v));
@@ -441,6 +445,7 @@ document.addEventListener("click",e=>{
  if(a=="pick")return bookPicker();
  if(a=="aksave"){const v=$("#ak").value.trim();if(!v)return;if(!/^sk-ant-/.test(v)){$("#akst").textContent="格式不對，API key 應該以 sk-ant- 開頭。";return}ls.set("br.ai",v);return renderSettings()}
  if(a=="akclear"){ls.set("br.ai","");return renderSettings()}
+ if(a=="avclear"){myId();store.me={...store.me,avatar:"",t:now()};saveStore();if(store.me.name)coApi("me",{avatar:""}).catch(()=>{});coCache=null;return renderSettings()}
  if(a=="quota"){const st=$("#quotast");const code=$("#code").value.trim();ls.set("br.code",code);if(!code)return;st.textContent="…";
   fetch(RELAY+"/quota",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code})}).then(r=>r.json()).then(j=>{if(j.error){st.textContent=j.error;return}ls.set("br.quota",{used:j.used,limit:j.limit});st.textContent=`${j.name}｜本月已用 US$${j.used.toFixed(2)} / US$${j.limit}`}).catch(e=>st.textContent="連線失敗："+e.message);return}
  if(a=="sync"){ls.set("br.gh",$("#gh").value.trim());return sync(true)}
@@ -454,6 +459,14 @@ document.addEventListener("input",e=>{
 document.addEventListener("change",async e=>{
  if(e.target.id==="planpick"){store.plan.id={v:e.target.value,t:now()};setupPlan();saveStore();renderPlan();renderRail()}
  if(e.target.id==="start"&&e.target.value){store.plan.start={v:e.target.value,t:now()};saveStore();renderPlan();renderRail()}
+ if(e.target.id==="avatar"){const f=e.target.files[0];if(!f)return;const st=$("#avst");st.textContent="處理中…";
+  try{const url=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
+   const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});
+   const N=160,cv=document.createElement("canvas");cv.width=cv.height=N;const k=Math.min(img.width,img.height);
+   cv.getContext("2d").drawImage(img,(img.width-k)/2,(img.height-k)/2,k,k,0,0,N,N);
+   const av=cv.toDataURL("image/jpeg",0.8);myId();store.me={...store.me,avatar:av,t:now()};saveStore();
+   if(store.me.name){const j=await coApi("me",{avatar:av});if(j.error){st.textContent=j.error;return}}coCache=null;renderSettings();$("#avst").textContent="已更新"}
+  catch(x){st.textContent="無法讀取這張圖片"}return}
  if(e.target.id==="imp"){const f=e.target.files[0];if(!f)return;try{store=merge(store,JSON.parse(await f.text()));setupPlan();ls.set("br.store",store);saveStore();e.target.value="";alert("已匯入")}catch(x){alert("檔案格式不正確")}}
 });
 document.addEventListener("keydown",e=>{

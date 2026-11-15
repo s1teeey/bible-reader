@@ -111,6 +111,12 @@ async function co(action, b, env, json) {
 
   if (action === "me") {
     if (b.name != null) me.name = clean(b.name, 20);
+    if (b.avatar != null) {
+      const a = String(b.avatar);
+      if (a === "") me.avatar = "";
+      else if (/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(a) && a.length <= 60000) me.avatar = a;
+      else return json({ error: "頭像格式不正確或檔案太大" }, 400);
+    }
     if (b.st) me.st = {
       plan: clean(b.st.plan, 30), day: +b.st.day || 0, days: +b.st.days || 0,
       today: clean(b.st.today, 60), ok: !!b.st.ok, streak: +b.st.streak || 0, pct: Math.max(0, Math.min(100, +b.st.pct || 0)),
@@ -158,7 +164,7 @@ async function co(action, b, env, json) {
       if (!g) continue;
       const members = await Promise.all(g.members.map(async (mid) => {
         const m = await env.KV.get("m:" + mid, "json");
-        return m ? { me: mid === id, name: m.name, st: m.st, u: m.u } : null;
+        return m ? { me: mid === id, name: m.name, avatar: m.avatar || "", st: m.st, u: m.u } : null;
       }));
       out.push({ gid, name: g.name, owner: g.owner === id, members: members.filter(Boolean) });
     }
