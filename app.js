@@ -388,7 +388,7 @@ async function sync(manual){
    if(r.ok){const f=(await r.json()).files[FILE];if(f){const txt=f.truncated?await (await fetch(f.raw_url)).text():f.content;try{remote=JSON.parse(txt)}catch(e){}}}else id="";}
   const merged=remote?merge(store,remote):store;
   const body=JSON.stringify({files:{[FILE]:{content:JSON.stringify(merged)}}});
-  const r=id?await fetch("https://api.github.com/gists/"+id,{method:"PATCH",headers:H,body}):await fetch("https://api.github.com/gists",{method:"POST",headers:H,body:JSON.stringify({description:"Bible Hunter 聖經獵人",public:false,files:{[FILE]:{content:JSON.stringify(merged)}}})});
+  const r=id?await fetch("https://api.github.com/gists/"+id,{method:"PATCH",headers:H,body}):await fetch("https://api.github.com/gists",{method:"POST",headers:H,body:JSON.stringify({description:"Bible Hunger",public:false,files:{[FILE]:{content:JSON.stringify(merged)}}})});
   if(!r.ok)throw new Error("GitHub "+r.status);
   if(!id)id=(await r.json()).id;ls.set("br.gist",id);
   const changed=JSON.stringify(merged)!==JSON.stringify(store);
