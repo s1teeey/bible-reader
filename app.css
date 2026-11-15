@@ -22,7 +22,7 @@
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;touch-action:manipulation}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:15px;line-height:1.75;-webkit-font-smoothing:antialiased}
 button,input,textarea,select{font:inherit;color:inherit}
 button{background:none;border:0;padding:0;cursor:pointer}
@@ -63,7 +63,9 @@ main{min-width:0;overflow:auto;position:relative}
 
 /* ---------- reader ---------- */
 .reader{max-width:700px;margin:0 auto;padding:40px 40px 120px}
-.chead{display:flex;align-items:baseline;gap:14px;border-bottom:2px solid var(--rule);padding-bottom:12px;margin-bottom:22px}
+.rhead{position:sticky;top:0;z-index:5;background:var(--bg);margin:-40px 0 22px;padding-top:28px}
+.chead{display:flex;align-items:baseline;gap:14px;border-bottom:2px solid var(--rule);padding-bottom:12px}
+.phead{position:sticky;top:0;z-index:5;background:var(--bg);margin-top:-40px;padding-top:28px}
 .chead h1{font-size:30px}
 .chead .pick{font-size:30px;font-weight:900}
 .chead .sp{flex:1}
@@ -139,7 +141,7 @@ main{min-width:0;overflow:auto;position:relative}
 
 /* ---------- pages ---------- */
 .page{max-width:880px;margin:0 auto;padding:40px 40px 120px}
-.page>h1{font-size:30px;border-bottom:2px solid var(--rule);padding-bottom:12px;margin-bottom:22px;display:flex;align-items:baseline;gap:14px}
+.page h1{font-size:30px;border-bottom:2px solid var(--rule);padding-bottom:12px;margin-bottom:22px;display:flex;align-items:baseline;gap:14px}
 .page>h1 small{font-size:14px;color:var(--muted);font-weight:700;margin-left:auto}
 .progress{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin:4px 0 20px}
 .progress i{display:block;height:100%;background:var(--accent)}
@@ -236,7 +238,12 @@ main{min-width:0;overflow:auto;position:relative}
   .mtop .pick svg{width:14px;height:14px;color:var(--faint)}
   .reader,.page{padding:20px 18px 40px}
   .reader .chead{display:none}
-  .page>h1{font-size:26px}
+  .page h1{font-size:26px}
+  .rhead{top:calc(52px + env(safe-area-inset-top));margin:-20px -18px 18px;padding:8px 18px 0}
+  .phead{margin:-20px -18px 0;padding:14px 18px 0}
+  .psearch{position:sticky;top:0;z-index:5;background:var(--bg);margin:-20px -18px 0;padding:14px 18px 10px}
+  .plist{position:sticky;top:62px;z-index:4;background:var(--bg)}
+  input,textarea,select{font-size:16px}
   .tabbar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--bg);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
   .tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 6px;font-size:11px;font-weight:800;color:var(--faint)}
   .tabbar button svg{width:22px;height:22px}
@@ -255,6 +262,6 @@ main{min-width:0;overflow:auto;position:relative}
   .spane{padding:18px 18px 40px}
   .stabs{padding:0 18px;top:52px}
 }
-.mseg{gap:18px;border-bottom:1px solid var(--line);margin:-6px 0 20px}
+.mseg{gap:18px;border-bottom:1px solid var(--line);margin:0}
 .mseg button{font-weight:800;color:var(--muted);padding:6px 0 10px;border-bottom:2px solid transparent;font-size:15px}
 .mseg button.on{color:var(--ink);border-bottom-color:var(--accent)}

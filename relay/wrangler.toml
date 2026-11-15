@@ -1,0 +1,7 @@
+name = "bible-reader-ai"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "e15fde6a955148d79d6b82623c29c38e"

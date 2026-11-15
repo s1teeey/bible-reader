@@ -1,17 +1,33 @@
 "use strict";
+const RELAY="https://bible-reader-ai.ju4t4r1.workers.dev";
 /* ---------- data ---------- */
 const BOOKS=[["馬太福音","太",28],["馬可福音","可",16],["路加福音","路",24],["約翰福音","約",21],["使徒行傳","徒",28],["羅馬書","羅",16],["哥林多前書","林前",16],["哥林多後書","林後",13],["加拉太書","加",6],["以弗所書","弗",6],["腓立比書","腓",4],["歌羅西書","西",4],["帖撒羅尼迦前書","帖前",5],["帖撒羅尼迦後書","帖後",3],["提摩太前書","提前",6],["提摩太後書","提後",4],["提多書","多",3],["腓利門書","門",1],["希伯來書","來",13],["雅各書","雅",5],["彼得前書","彼前",5],["彼得後書","彼後",3],["約翰一書","約壹",5],["約翰二書","約貳",1],["約翰三書","約參",1],["猶大書","猶",1],["啟示錄","啟",22]];
 const GROUPS=[["福音書",0,4],["歷史",4,5],["保羅書信",5,18],["普通書信",18,26],["預言",26,27]];
 const COLORS=["y","g","b","p"];
-const DAYS=90;
 const ALL=[];BOOKS.forEach((b,i)=>{for(let c=1;c<=b[2];c++)ALL.push([i,c])});
-const PLAN=Array.from({length:DAYS},(_,d)=>ALL.slice(Math.round(d*ALL.length/DAYS),Math.round((d+1)*ALL.length/DAYS)));
+const rng=(a,z)=>Array.from({length:z-a+1},(_,i)=>a+i);
+const PLANS=[
+ {id:"nt90",n:"90 天讀完新約全書",d:90,b:rng(0,26)},
+ {id:"nt30",n:"30 天讀一遍新約",d:30,b:rng(0,26)},
+ {id:"nt40",n:"40 天讀完新約",d:40,b:rng(0,26)},
+ {id:"nt260",n:"新約一天一章",d:260,b:rng(0,26)},
+ {id:"gos30",n:"30 天四福音",d:30,b:rng(0,3)},
+ {id:"lkac",n:"路加福音與使徒行傳",d:52,b:[2,4]},
+ {id:"epi85",n:"新約書信和使徒行傳",d:85,b:rng(4,25)},
+ {id:"thes",n:"帖撒羅尼迦前書和後書",d:4,b:[12,13]},
+ {id:"tim",n:"提摩太前書和後書",d:5,b:[14,15]},
+ {id:"pet",n:"彼得前書和彼得後書",d:4,b:[20,21]},
+];
+let PLAN,DAYS,curPlan;
+function setupPlan(){curPlan=PLANS.find(p=>p.id===(store.plan.id||{}).v)||PLANS[0];const ch=ALL.filter(([b])=>curPlan.b.includes(b));DAYS=curPlan.d;
+ PLAN=Array.from({length:DAYS},(_,d)=>ch.slice(Math.round(d*ch.length/DAYS),Math.round((d+1)*ch.length/DAYS)))}
 
 /* ---------- storage ---------- */
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const todayStr=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 let store=ls.get("br.store",null)||{v:{},read:{},plan:{start:{v:todayStr(),t:0},done:{}}};
 store.v=store.v||{};store.read=store.read||{};store.plan=store.plan||{start:{v:todayStr(),t:0},done:{}};
+setupPlan();
 let pref=ls.get("br.pref",{b:5,c:1,en:false,theme:"auto",fs:19,view:"read",stab:"guide"});
 const savePref=()=>ls.set("br.pref",pref);
 let syncTimer=null;
@@ -105,10 +121,10 @@ async function renderRead(){
  const prev=ALL.findIndex(([x,y])=>x==b&&y==c);
  const P=ALL[prev-1],N=ALL[prev+1];
  $("main").innerHTML=`<div class="reader">
-  <div class="chead"><h1>${BOOKS[b][0]} ${c}</h1><span class="sp"></span>
+  <div class="rhead"><div class="chead"><h1>${BOOKS[b][0]} ${c}</h1><span class="sp"></span>
    <button class="toggle ${pref.en?"on":""}" data-act="en">EN</button>
    <button class="iconbtn" data-act="prev" ${P?"":"disabled"}>${I.l}</button><button class="iconbtn" data-act="next" ${N?"":"disabled"}>${I.r}</button></div>
-  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button></div>
+  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button></div></div>
   ${mseg=="guide"&&!wide()?`<div class="guide">${guideHTML()}</div>`:`<div class="text">${verses}</div>`}
   <div class="pager"><button data-act="prev" ${P?"":"hidden"}>← ${P?chRef(P):""}</button>
    <button data-act="next" class="${N?"":"done"}">${isRead(b,c)?"":"讀完，"}${N?chRef(N)+" →":"完成"}</button></div>
@@ -170,7 +186,11 @@ async function ask(scope){
  const vt=n?(curText.find(x=>x[0]==n)||[])[1]:"";
  const ctx=n?`經文：${BOOKS[b][0]} ${c}:${n}「${vt}」`:`經文：${BOOKS[b][0]} 第 ${c} 章\n`+curText.map(v=>v[0]+" "+v[1]).join("\n");
  const prompt=`${ctx}\n\n問題：${q||(n?"請解釋這節的意思、上下文與背景。":"請說明這章的主旨、架構與重點。")}`;
- const key=ls.get("br.ai","");
+ const key=ls.get("br.ai",""),code=ls.get("br.code","");
+ if(!key&&code){out.hidden=false;out.textContent="…";
+  try{const r=await fetch(RELAY+"/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code,prompt})});const j=await r.json();
+   out.textContent=j.error?j.error:j.text;if(j.used!=null)ls.set("br.quota",{used:j.used,limit:j.limit})}catch(e){out.textContent="連線失敗："+e.message}
+  return}
  if(!key){window.open("https://claude.ai/new?q="+encodeURIComponent(prompt),"_blank");return}
  out.hidden=false;out.textContent="…";
  try{const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-beta":"server-side-fallback-2026-07-01","anthropic-dangerous-direct-browser-access":"true"},
@@ -183,9 +203,9 @@ async function ask(scope){
 /* ---------- plan ---------- */
 function renderPlan(){
  const td=dayIndex(),done=PLAN.filter((_,d)=>dayDone(d)).length;
- $("main").innerHTML=`<div class="page"><h1>新約 90 天<small>${done} / ${DAYS}</small></h1>
- <div class="progress"><i style="width:${done/DAYS*100}%"></i></div>
- <div class="row" style="margin-bottom:18px"><span class="label" style="margin:0">開始日期</span><input type="date" id="start" value="${store.plan.start.v}"></div>
+ $("main").innerHTML=`<div class="page"><div class="phead"><h1>${esc(curPlan.n)}<small>${done} / ${DAYS}</small></h1>
+ <div class="progress"><i style="width:${done/DAYS*100}%"></i></div></div>
+ <div class="row" style="margin-bottom:18px"><select id="planpick" style="width:auto">${PLANS.map(p=>`<option value="${p.id}" ${p.id==curPlan.id?"selected":""}>${esc(p.n)}｜${p.d} 天</option>`).join("")}</select><span class="label" style="margin:0 0 0 8px">開始日期</span><input type="date" id="start" value="${store.plan.start.v}"></div>
  <div class="days">${PLAN.map((p,d)=>`<div class="day ${d==td?"today":""} ${dayDone(d)?"done":""}" id="day${d}"><span class="no">${String(d+1).padStart(2,"0")}</span><span class="rd" data-go="${p[0][0]}.${p[0][1]}">${dayLabel(d)}<span class="dt">${dayDate(d)}</span></span><button class="chk ${dayDone(d)?"on":""}" data-day="${d}">${dayDone(d)?I.ok:""}</button></div>`).join("")}</div></div>`;
  document.getElementById("day"+td)?.scrollIntoView({block:"center"});
 }
@@ -195,7 +215,7 @@ let nfilter="all";
 async function renderNotes(){
  const items=Object.entries(store.v).filter(([,v])=>(v.h||v.n)&&(nfilter=="all"||(nfilter=="n"?v.n:v.h))).map(([k,v])=>[k.split(".").map(Number),v]).sort((a,b)=>a[0][0]-b[0][0]||a[0][1]-b[0][1]||a[0][2]-b[0][2]);
  const books=[...new Set(items.map(x=>x[0][0]))];const texts=await Promise.all(books.map(getBook));const T={};books.forEach((b,i)=>T[b]=texts[i]);
- let h=`<div class="page"><h1>筆記<small>${items.length}</small></h1><div class="filters">${[["all","全部"],["n","筆記"],["h","劃線"]].map(([k,t])=>`<button data-nf="${k}" class="${nfilter==k?"on":""}">${t}</button>`).join("")}</div><div class="nlist">`;
+ let h=`<div class="page"><div class="phead"><h1>筆記<small>${items.length}</small></h1><div class="filters">${[["all","全部"],["n","筆記"],["h","劃線"]].map(([k,t])=>`<button data-nf="${k}" class="${nfilter==k?"on":""}">${t}</button>`).join("")}</div></div><div class="nlist">`;
  let last=-1;
  for(const [[b,c,n],v] of items){if(b!=last){h+=`<div class="nb">${BOOKS[b][0]}</div>`;last=b}
   const zh=((T[b][c-1]||[]).find(x=>x[0]==n)||[])[1]||"";
@@ -250,8 +270,10 @@ function renderSettings(){
   <div class="ask"><input id="gh" type="password" value="${esc(tok)}" placeholder="ghp_…" autocomplete="off"><button class="btn" data-act="sync">同步</button></div>
   <div class="status" id="syncst">${last?"上次同步："+new Date(last).toLocaleString("zh-TW"):""}</div>
   <p class="hint" style="margin-top:6px"><a href="https://github.com/settings/tokens/new?scopes=gist&description=%E6%96%B0%E7%B4%84%E8%AE%80%E7%B6%93%E6%9C%AC" target="_blank" rel="noopener" style="color:inherit">產生 token</a></p></div>
- <div class="grp"><h3>AI</h3><p class="hint" style="margin-bottom:8px">填 Anthropic API Key 會直接在頁面回答；不填則開啟 claude.ai 並帶入問題。</p>
-  <input id="ak" type="password" value="${esc(ls.get("br.ai",""))}" placeholder="sk-ant-…" autocomplete="off"></div>
+ <div class="grp"><h3>AI 邀請碼</h3><div class="ask"><input id="code" value="${esc(ls.get("br.code",""))}" placeholder="例如 ab3k-9xmp" autocomplete="off" autocapitalize="off"><button class="btn" data-act="quota">確認</button></div>
+  <div class="status" id="quotast">${(q=>q?`本月已用 US$${q.used.toFixed(2)} / US$${q.limit}`:"")(ls.get("br.quota",null))}</div>
+  <p class="hint" style="margin-top:6px">沒有邀請碼時，按「問」會開啟 claude.ai。</p></div>
+ <div class="grp"><h3>自己的 API Key</h3><input id="ak" type="password" value="${esc(ls.get("br.ai",""))}" placeholder="sk-ant-…（選填）" autocomplete="off"></div>
  <div class="grp"><h3>資料</h3><div class="row"><button class="btn ghost" data-act="export">匯出</button><label class="btn ghost" style="cursor:pointer">匯入<input type="file" id="imp" accept=".json" hidden></label></div></div>
  </div>`;
 }
@@ -259,7 +281,7 @@ function renderSettings(){
 /* ---------- sync (GitHub Gist) ---------- */
 const FILE="bible-reader.json";
 function mergeMap(a={},b={}){const o={...a};for(const k in b)if(!o[k]||(b[k].t||0)>(o[k].t||0))o[k]=b[k];return o}
-function merge(a,b){return{v:mergeMap(a.v,b.v),read:mergeMap(a.read,b.read),plan:{start:(b.plan?.start?.t||0)>(a.plan?.start?.t||0)?b.plan.start:a.plan.start,done:{}}}}
+function merge(a,b){return{v:mergeMap(a.v,b.v),read:mergeMap(a.read,b.read),plan:{start:(b.plan?.start?.t||0)>(a.plan?.start?.t||0)?b.plan.start:a.plan.start,id:(b.plan?.id?.t||0)>(a.plan?.id?.t||0)?b.plan.id:a.plan?.id,done:{}}}}
 let syncing=false;
 async function sync(manual){
  const tok=ls.get("br.gh","");const st=$("#syncst");
@@ -278,7 +300,7 @@ async function sync(manual){
   if(!r.ok)throw new Error("GitHub "+r.status);
   if(!id)id=(await r.json()).id;ls.set("br.gist",id);
   const changed=JSON.stringify(merged)!==JSON.stringify(store);
-  store=merged;ls.set("br.store",store);ls.set("br.synced",now());
+  store=merged;ls.set("br.store",store);setupPlan();ls.set("br.synced",now());
   const s2=$("#syncst");if(s2)s2.textContent="已同步　"+new Date().toLocaleString("zh-TW");
   if(changed&&pref.view!=="settings"&&!document.activeElement?.matches("textarea"))render();
  }catch(e){const s2=$("#syncst");if(s2)s2.textContent="同步失敗："+e.message}
@@ -313,6 +335,8 @@ document.addEventListener("click",e=>{
  if(a=="en"){pref.en=!pref.en;savePref();return renderRead()}
  if(a=="prev"||a=="next"){const i=ALL.findIndex(([x,y])=>x==pref.b&&y==pref.c);if(a=="next")setRead(pref.b,pref.c,true);const n=ALL[i+(a=="next"?1:-1)];if(n)openChapter(n[0],n[1]);else renderRead();return}
  if(a=="pick")return bookPicker();
+ if(a=="quota"){const st=$("#quotast");const code=$("#code").value.trim();ls.set("br.code",code);if(!code)return;st.textContent="…";
+  fetch(RELAY+"/quota",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code})}).then(r=>r.json()).then(j=>{if(j.error){st.textContent=j.error;return}ls.set("br.quota",{used:j.used,limit:j.limit});st.textContent=`${j.name}｜本月已用 US$${j.used.toFixed(2)} / US$${j.limit}`}).catch(e=>st.textContent="連線失敗："+e.message);return}
  if(a=="sync"){ls.set("br.gh",$("#gh").value.trim());return sync(true)}
  if(a=="export"){const u=URL.createObjectURL(new Blob([JSON.stringify(store)],{type:"application/json"}));const x=document.createElement("a");x.href=u;x.download=`bible-reader-${todayStr()}.json`;x.click();return}
 });
@@ -320,10 +344,12 @@ document.addEventListener("input",e=>{
  if(e.target.id==="note"&&sel){setV(pref.b,pref.c,sel,{n:e.target.value});refreshVerse(sel)}
  if(e.target.id==="ak")ls.set("br.ai",e.target.value.trim());
  if(e.target.id==="gh")ls.set("br.gh",e.target.value.trim());
+ if(e.target.id==="code")ls.set("br.code",e.target.value.trim());
 });
 document.addEventListener("change",async e=>{
+ if(e.target.id==="planpick"){store.plan.id={v:e.target.value,t:now()};setupPlan();saveStore();renderPlan();renderRail()}
  if(e.target.id==="start"&&e.target.value){store.plan.start={v:e.target.value,t:now()};saveStore();renderPlan();renderRail()}
- if(e.target.id==="imp"){const f=e.target.files[0];if(!f)return;try{store=merge(store,JSON.parse(await f.text()));ls.set("br.store",store);saveStore();e.target.value="";alert("已匯入")}catch(x){alert("檔案格式不正確")}}
+ if(e.target.id==="imp"){const f=e.target.files[0];if(!f)return;try{store=merge(store,JSON.parse(await f.text()));setupPlan();ls.set("br.store",store);saveStore();e.target.value="";alert("已匯入")}catch(x){alert("檔案格式不正確")}}
 });
 document.addEventListener("keydown",e=>{
  if(e.target.matches("input,textarea"))return;
@@ -334,6 +360,10 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id?.startsWith("q-"))ask(e.target.id.slice(2));if(e.key==="Enter"&&e.target.id==="psearch")searchPerson(e.target.value)});
 document.addEventListener("search",e=>{if(e.target.id==="psearch")searchPerson(e.target.value)},true);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")sync()});
+let tx=null,ty=null;
+document.addEventListener("touchstart",e=>{if(pref.view!=="read"||wide()||!e.target.closest("main")){tx=null;return}tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
+document.addEventListener("touchend",e=>{if(tx==null)return;const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;tx=null;
+ if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.5)return;const n=dx<0?"guide":"text";if(n===mseg)return;mseg=n;renderRead().then(()=>window.scrollTo(0,0))},{passive:true});
 let lastWide=wide();addEventListener("resize",()=>{if(wide()!==lastWide){lastWide=wide();applyPrefs();render()}});
 
 applyPrefs();render();sync();
