@@ -35,6 +35,7 @@ export default {
         const used = +(await env.KV.get(`use:${code}:${month()}`) || 0);
         return json({ name: c.name, used, limit: c.limit ?? DEFAULT_LIMIT });
       }
+      if (url.pathname.startsWith("/co/") && req.method === "POST") return await co(url.pathname.slice(4), await req.json(), env, json);
       if (url.pathname === "/admin") return new Response(ADMIN_HTML, { headers: { "content-type": "text/html; charset=utf-8" } });
       if (url.pathname === "/admin/api") return await admin(req, env, json);
       return json({ error: "not found" }, 404);
@@ -84,6 +85,86 @@ async function ask(req, env, json) {
   if (j.stop_reason === "refusal") return json({ text: "這個問題沒有得到回答，換個問法試試。", used: total, limit });
   const text = (j.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
   return json({ text, used: total, limit });
+}
+
+// ---------- 好友共讀 ----------
+// KV: m:<id> -> {h: sha256(secret), name, groups:[gid], st:{...status}, u}
+//     g:<gid> -> {name, owner, members:[id], created}
+const MAX_MEMBERS = 6, MAX_GROUPS = 3;
+const ALPHA = "abcdefghjkmnpqrstuvwxyz23456789";
+const rid = (n) => [...crypto.getRandomValues(new Uint8Array(n))].map((x) => ALPHA[x % ALPHA.length]).join("");
+async function sha(s) {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+}
+const clean = (s, n) => String(s || "").replace(/[<>]/g, "").trim().slice(0, n);
+
+async function co(action, b, env, json) {
+  const id = clean(b.id, 40), secret = String(b.secret || "");
+  if (!/^[a-z0-9]{8,40}$/.test(id) || secret.length < 16) return json({ error: "身份資料不正確" }, 400);
+  const mk = "m:" + id;
+  let me = await env.KV.get(mk, "json");
+  const h = await sha(secret);
+  if (me && me.h !== h) return json({ error: "身份驗證失敗" }, 403);
+  if (!me) me = { h, name: "", groups: [], st: null, u: 0 };
+  const saveMe = () => env.KV.put(mk, JSON.stringify(me));
+
+  if (action === "me") {
+    if (b.name != null) me.name = clean(b.name, 20);
+    if (b.st) me.st = {
+      plan: clean(b.st.plan, 30), day: +b.st.day || 0, days: +b.st.days || 0,
+      today: clean(b.st.today, 60), ok: !!b.st.ok, streak: +b.st.streak || 0, pct: Math.max(0, Math.min(100, +b.st.pct || 0)),
+    };
+    me.u = Date.now();
+    await saveMe();
+    return json({ ok: true });
+  }
+  if (!me.name) return json({ error: "請先設定暱稱" }, 400);
+
+  if (action === "create") {
+    if (me.groups.length >= MAX_GROUPS) return json({ error: `最多只能參加 ${MAX_GROUPS} 個小組` }, 400);
+    const name = clean(b.name, 20) || "共讀小組";
+    const gid = rid(8);
+    await env.KV.put("g:" + gid, JSON.stringify({ name, owner: id, members: [id], created: Date.now() }));
+    me.groups.push(gid); await saveMe();
+    return json({ gid });
+  }
+  if (action === "join") {
+    const gid = clean(b.gid, 12).toLowerCase();
+    const g = await env.KV.get("g:" + gid, "json");
+    if (!g) return json({ error: "找不到這個小組，請確認邀請碼" }, 404);
+    if (g.members.includes(id)) return json({ gid });
+    if (me.groups.length >= MAX_GROUPS) return json({ error: `最多只能參加 ${MAX_GROUPS} 個小組` }, 400);
+    if (g.members.length >= MAX_MEMBERS) return json({ error: `這個小組已經滿 ${MAX_MEMBERS} 人了` }, 400);
+    g.members.push(id); await env.KV.put("g:" + gid, JSON.stringify(g));
+    me.groups.push(gid); await saveMe();
+    return json({ gid });
+  }
+  if (action === "leave") {
+    const gid = clean(b.gid, 12);
+    const g = await env.KV.get("g:" + gid, "json");
+    if (g) {
+      g.members = g.members.filter((x) => x !== id);
+      if (!g.members.length) await env.KV.delete("g:" + gid);
+      else { if (g.owner === id) g.owner = g.members[0]; await env.KV.put("g:" + gid, JSON.stringify(g)); }
+    }
+    me.groups = me.groups.filter((x) => x !== gid); await saveMe();
+    return json({ ok: true });
+  }
+  if (action === "groups") {
+    const out = [];
+    for (const gid of me.groups) {
+      const g = await env.KV.get("g:" + gid, "json");
+      if (!g) continue;
+      const members = await Promise.all(g.members.map(async (mid) => {
+        const m = await env.KV.get("m:" + mid, "json");
+        return m ? { me: mid === id, name: m.name, st: m.st, u: m.u } : null;
+      }));
+      out.push({ gid, name: g.name, owner: g.owner === id, members: members.filter(Boolean) });
+    }
+    return json({ groups: out });
+  }
+  return json({ error: "unknown action" }, 400);
 }
 
 async function admin(req, env, json) {

@@ -37,7 +37,7 @@ const vkey=(b,c,n)=>`${b}.${c}.${n}`;
 const getV=(b,c,n)=>store.v[vkey(b,c,n)]||{};
 function setV(b,c,n,patch){const k=vkey(b,c,n);store.v[k]={...(store.v[k]||{}),...patch,t:now()};saveStore()}
 const isRead=(b,c)=>!!(store.read[`${b}.${c}`]||{}).d;
-function setRead(b,c,d){store.read[`${b}.${c}`]={d:d?1:0,t:now()};saveStore()}
+function setRead(b,c,d){store.read[`${b}.${c}`]={d:d?1:0,t:now()};saveStore();pushStatus()}
 
 /* ---------- fetch ---------- */
 const textCache={},guideCache={};
@@ -61,7 +61,7 @@ const I={
  people:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.4 3-5 6-5s5.4 1.6 6 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14c2.6.2 4 1.8 4.5 4.5"/></svg>',
  set:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>',
 };
-const VIEWS=[["read","讀經",I.read],["plan","計畫",I.plan],["notes","筆記",I.notes],["people","人物",I.people],["settings","設定",I.set]];
+const VIEWS=[["read","讀經",I.read],["plan","計畫",I.plan],["notes","筆記",I.notes],["co","共讀",I.people],["settings","設定",I.set]];
 function parseRange(r){const [a,b]=String(r).split(/[-–]/).map(Number);return [a,b||a]}
 function dayIndex(){const s=new Date(store.plan.start.v+"T00:00:00");const d=Math.floor((new Date(todayStr()+"T00:00:00")-s)/864e5);return Math.max(0,Math.min(DAYS-1,d))}
 const dayDone=d=>PLAN[d].every(([b,c])=>isRead(b,c));
@@ -111,6 +111,7 @@ async function render(){
  if(pref.view==="plan")renderPlan();
  if(pref.view==="notes")renderNotes();
  if(pref.view==="people")renderPeople();
+ if(pref.view==="co")renderCo();
  if(pref.view==="settings")renderSettings();
 }
 
@@ -299,7 +300,7 @@ function searchPerson(q){
 async function renderPeople(){
  const p=curP();
  let groups="",lg="";PEOPLE.forEach((x,i)=>{if(x.g!=lg){groups+=`<div class="pg">${x.g}</div>`;lg=x.g}groups+=`<button data-person="${i}" class="${i==person?"on":""}">${x.n}</button>`});
- $("main").innerHTML=`<div class="page"><div class="psearch"><input id="psearch" type="search" placeholder="搜尋人名或詞語" value="${person<0?esc(p.n):""}" autocomplete="off"></div><div class="people"><div class="plist">${groups}</div><div id="pd"></div></div></div>`;
+ $("main").innerHTML=`<div class="page"><button class="back" data-v="settings">← 設定</button><div class="psearch"><input id="psearch" type="search" placeholder="搜尋人名或詞語" value="${person<0?esc(p.n):""}" autocomplete="off"></div><div class="people"><div class="plist">${groups}</div><div id="pd"></div></div></div>`;
  document.querySelector(".plist .on")?.scrollIntoView({block:"nearest",inline:"center"});
  const C=await countFor(p);
  const tot=C.map(b=>b.reduce((s,x)=>s+x,0)),max=Math.max(...tot,1),nb=tot.filter(x=>x).length,sum=tot.reduce((s,x)=>s+x,0);
@@ -315,10 +316,44 @@ async function renderPeople(){
  $("#pd").innerHTML=h;
 }
 
+/* ---------- co-reading ---------- */
+const rid=n=>Array.from(crypto.getRandomValues(new Uint8Array(n)),x=>"abcdefghjkmnpqrstuvwxyz23456789"[x%31]).join("");
+function myId(){if(!store.me){store.me={id:rid(16),secret:rid(32),name:"",t:now()};saveStore()}return store.me}
+async function coApi(action,extra={}){const m=myId();const r=await fetch(RELAY+"/co/"+action,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:m.id,secret:m.secret,...extra})});return r.json()}
+function coStatus(){const d=dayIndex(),done=PLAN.filter((_,x)=>dayDone(x)).length;return{plan:curPlan.n,day:d+1,days:DAYS,today:dayLabel(d),ok:dayDone(d),streak:streak(),pct:Math.round(done/DAYS*100)}}
+let pushT=null;function pushStatus(){if(!store.me?.name||!navigator.onLine)return;clearTimeout(pushT);pushT=setTimeout(()=>coApi("me",{st:coStatus()}).catch(()=>{}),2000)}
+let coJoin="",coCache=null;
+async function renderCo(){
+ const m=store.me;
+ if(!m||!m.name){$("main").innerHTML=`<div class="page"><div class="phead"><h1>共讀</h1></div>
+  <div class="co-start"><p>取一個朋友認得出來的暱稱。</p><div class="ask"><input id="coname" maxlength="20" placeholder="暱稱"><button class="btn" data-act="coname">開始</button></div><div class="status" id="cost"></div></div></div>`;return}
+ const card=g=>`<section class="cog"><div class="cog-h"><h2>${esc(g.name)}</h2><span class="sp"></span><span class="cog-n">${g.members.length} / 6</span></div>
+  <div class="cog-m">${g.members.map(x=>{const st=x.st;return `<div class="com ${st?(st.ok?"ok":"todo"):""}"><div class="com-a">${esc((x.name||"?").slice(0,1))}</div><div class="com-b"><div class="com-n">${esc(x.name)}${x.me?"<small>（我）</small>":""}</div>
+   ${st?`<div class="com-t"><b>Today:</b> ${esc(st.today)}</div><div class="com-p">${esc(st.plan)}｜第 ${st.day} / ${st.days} 天｜連續 ${st.streak} 天</div><div class="com-bar"><i style="width:${st.pct}%"></i></div>`:`<div class="com-p">還沒有進度</div>`}</div></div>`}).join("")}</div>
+  <div class="cog-f"><span class="cog-code">邀請碼 <b>${g.gid}</b></span><button class="btn ghost" data-cocopy="${g.gid}">複製邀請連結</button><button class="linkbtn" data-coleave="${g.gid}">離開</button></div></section>`;
+ const draw=(groups,err)=>{$("main").innerHTML=`<div class="page"><div class="phead"><h1>共讀<small>${esc(m.name)}　<button class="linkbtn" data-act="corename">改暱稱</button></small></h1></div>
+  ${err?`<p class="status">${esc(err)}</p>`:""}
+  ${groups==null?`<p class="empty">載入中…</p>`:groups.map(card).join("")||`<p class="empty">還沒有加入小組。</p>`}
+  ${groups&&groups.length>=3?`<p class="hint">最多可以參加 3 個小組。</p>`:`<div class="co-new"><div class="field"><div class="label">加入小組</div><div class="ask"><input id="cojoin" placeholder="邀請碼" value="${esc(coJoin)}" autocapitalize="off"><button class="btn" data-act="cojoin">加入</button></div></div>
+  <div class="field"><div class="label">建立小組</div><div class="ask"><input id="cocreate" maxlength="20" placeholder="小組名稱"><button class="btn ghost" data-act="cocreate">建立</button></div></div></div>`}
+  <div class="status" id="cost"></div></div>`};
+ draw(coCache);
+ try{const j=await coApi("groups");if(pref.view!=="co")return;if(j.error)return draw(coCache||[],j.error);coCache=j.groups;draw(coCache)}catch(e){if(pref.view==="co")draw(coCache||[],"連線失敗，請檢查網路")}
+}
+async function coAction(a,t){const st=()=>$("#cost");
+ try{
+  if(a=="coname"||a=="corename"){const n=a=="coname"?$("#coname").value.trim():(prompt("新暱稱",store.me.name)||"").trim();if(!n)return;
+   myId();store.me={...store.me,name:n.slice(0,20),t:now()};saveStore();const j=await coApi("me",{name:store.me.name,st:coStatus()});if(j.error)return st()&&(st().textContent=j.error);return renderCo()}
+  if(a=="cojoin"){const code=$("#cojoin").value.trim().replace(/^.*#join-/,"");if(!code)return;st().textContent="…";const j=await coApi("join",{gid:code});if(j.error)return st().textContent=j.error;coJoin="";pushStatus();return renderCo()}
+  if(a=="cocreate"){const n=$("#cocreate").value.trim();st().textContent="…";const j=await coApi("create",{name:n});if(j.error)return st().textContent=j.error;pushStatus();return renderCo()}
+ }catch(e){st()&&(st().textContent="連線失敗："+e.message)}
+}
+
 /* ---------- settings ---------- */
 function renderSettings(){
  const tok=ls.get("br.gh",""),last=ls.get("br.synced",0);
  $("main").innerHTML=`<div class="page set"><h1>設定</h1>
+ <div class="grp"><h3>人物 <span class="beta">Beta 實驗性功能</span></h3><button class="btn ghost" data-v="people">打開人物</button></div>
  <div class="grp"><h3>外觀</h3><div class="seg">${[["auto","跟隨系統"],["light","淺色"],["dark","深色"]].map(([k,t])=>`<button data-theme="${k}" class="${pref.theme==k?"on":""}">${t}</button>`).join("")}</div></div>
  <div class="grp"><h3>字級</h3><div class="seg">${[[17,"小"],[19,"中"],[21,"大"],[23,"特大"]].map(([k,t])=>`<button data-fs="${k}" class="${pref.fs==k?"on":""}">${t}</button>`).join("")}</div></div>
  <div class="grp"><h3>英文對照</h3><div class="seg"><button data-en="0" class="${pref.en?"":"on"}">關</button><button data-en="1" class="${pref.en?"on":""}">WEB</button></div></div>
@@ -338,7 +373,7 @@ function renderSettings(){
 /* ---------- sync (GitHub Gist) ---------- */
 const FILE="bible-reader.json";
 function mergeMap(a={},b={}){const o={...a};for(const k in b)if(!o[k]||(b[k].t||0)>(o[k].t||0))o[k]=b[k];return o}
-function merge(a,b){return{v:mergeMap(a.v,b.v),read:mergeMap(a.read,b.read),ai:mergeMap(a.ai,b.ai),plan:{start:(b.plan?.start?.t||0)>(a.plan?.start?.t||0)?b.plan.start:a.plan.start,id:(b.plan?.id?.t||0)>(a.plan?.id?.t||0)?b.plan.id:a.plan?.id,done:{}}}}
+function merge(a,b){return{me:((b.me?.t||0)>(a.me?.t||0)?b.me:a.me)||null,v:mergeMap(a.v,b.v),read:mergeMap(a.read,b.read),ai:mergeMap(a.ai,b.ai),plan:{start:(b.plan?.start?.t||0)>(a.plan?.start?.t||0)?b.plan.start:a.plan.start,id:(b.plan?.id?.t||0)>(a.plan?.id?.t||0)?b.plan.id:a.plan?.id,done:{}}}}
 let syncing=false;
 async function sync(manual){
  const tok=ls.get("br.gh","");const st=$("#syncst");
@@ -353,7 +388,7 @@ async function sync(manual){
    if(r.ok){const f=(await r.json()).files[FILE];if(f){const txt=f.truncated?await (await fetch(f.raw_url)).text():f.content;try{remote=JSON.parse(txt)}catch(e){}}}else id="";}
   const merged=remote?merge(store,remote):store;
   const body=JSON.stringify({files:{[FILE]:{content:JSON.stringify(merged)}}});
-  const r=id?await fetch("https://api.github.com/gists/"+id,{method:"PATCH",headers:H,body}):await fetch("https://api.github.com/gists",{method:"POST",headers:H,body:JSON.stringify({description:"新約讀經本",public:false,files:{[FILE]:{content:JSON.stringify(merged)}}})});
+  const r=id?await fetch("https://api.github.com/gists/"+id,{method:"PATCH",headers:H,body}):await fetch("https://api.github.com/gists",{method:"POST",headers:H,body:JSON.stringify({description:"Bible Hunter 聖經獵人",public:false,files:{[FILE]:{content:JSON.stringify(merged)}}})});
   if(!r.ok)throw new Error("GitHub "+r.status);
   if(!id)id=(await r.json()).id;ls.set("br.gist",id);
   const changed=JSON.stringify(merged)!==JSON.stringify(store);
@@ -395,7 +430,11 @@ document.addEventListener("click",e=>{
  if(d.theme){pref.theme=d.theme;savePref();applyPrefs();return renderSettings()}
  if(d.fs){pref.fs=+d.fs;savePref();applyPrefs();return renderSettings()}
  if(d.en!=null){pref.en=d.en=="1";savePref();return renderSettings()}
+ if(d.cocopy){const link=location.origin+location.pathname+"#join-"+d.cocopy;const msg=`一起來讀經！打開 ${link} ，或在「共讀」輸入邀請碼 ${d.cocopy}`;
+  navigator.clipboard?.writeText(msg).then(()=>{t.textContent="已複製"},()=>{t.textContent=d.cocopy}).finally(()=>setTimeout(()=>t.textContent="複製邀請連結",2000));return}
+ if(d.coleave){if(t.dataset.sure){coApi("leave",{gid:d.coleave}).then(()=>{coCache=null;renderCo()});return}t.dataset.sure=1;t.textContent="確定離開？";setTimeout(()=>{delete t.dataset.sure;t.textContent="離開"},3000);return}
  const a=d.act;
+ if(a&&a.startsWith("co"))return coAction(a,t);
  if(a=="en"){pref.en=!pref.en;savePref();return renderRead()}
  if(a=="prev"||a=="next"){const i=ALL.findIndex(([x,y])=>x==pref.b&&y==pref.c);if(a=="next")setRead(pref.b,pref.c,true);const n=ALL[i+(a=="next"?1:-1)];if(n)openChapter(n[0],n[1]);else renderRead();return}
  if(a=="pick")return bookPicker();
@@ -435,5 +474,6 @@ addEventListener("scroll",()=>{if(!$("#selbar").hidden)showSelbar()},true);
 let lastWide=wide();addEventListener("resize",()=>{if(wide()!==lastWide){lastWide=wide();applyPrefs();render()}});
 
 (()=>{const d=dayIndex();if(dayDone(d))return;const f=PLAN[d].find(([b,c])=>!isRead(b,c));if(f){pref.b=f[0];pref.c=f[1];pref.view="read";savePref()}})();
-applyPrefs();render();sync();
+if(location.hash.startsWith("#join-")){coJoin=location.hash.slice(6);pref.view="co";savePref();history.replaceState(null,"",location.pathname)}
+applyPrefs();render();sync();pushStatus();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http"))navigator.serviceWorker.register("sw.js");
