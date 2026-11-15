@@ -374,3 +374,5 @@ main{min-width:0;overflow:auto;position:relative}
 
 .updbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(76px + env(safe-area-inset-bottom));z-index:90;background:var(--accent);color:#fff;font-weight:800;font-size:14px;padding:10px 18px;border-radius:22px;box-shadow:0 6px 20px rgba(18,19,34,.25)}
 @media (min-width:721px){.updbar{bottom:24px}}
+.phead .todaypanel{margin:0 0 12px;padding:10px 12px}
+.phead .todaypanel .tp-l{margin-top:4px}
