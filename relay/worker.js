@@ -146,6 +146,15 @@ async function co(action, b, env, json) {
     me.groups.push(gid); await saveMe();
     return json({ gid });
   }
+  if (action === "rename") {
+    const gid = clean(b.gid, 12);
+    const g = await env.KV.get("g:" + gid, "json");
+    if (!g || !g.members.includes(id)) return json({ error: "你不在這個小組裡" }, 403);
+    const name = clean(b.name, 20);
+    if (!name) return json({ error: "請輸入小組名稱" }, 400);
+    g.name = name; await env.KV.put("g:" + gid, JSON.stringify(g));
+    return json({ ok: true });
+  }
   if (action === "leave") {
     const gid = clean(b.gid, 12);
     const g = await env.KV.get("g:" + gid, "json");

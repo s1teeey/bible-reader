@@ -302,7 +302,7 @@ function searchPerson(q){
 async function renderPeople(){
  const p=curP();
  let groups="",lg="";PEOPLE.forEach((x,i)=>{if(x.g!=lg){groups+=`<div class="pg">${x.g}</div>`;lg=x.g}groups+=`<button data-person="${i}" class="${i==person?"on":""}">${x.n}</button>`});
- $("main").innerHTML=`<div class="page"><button class="back" data-v="settings">← 設定</button><div class="psearch"><input id="psearch" type="search" placeholder="搜尋人名或詞語" value="${person<0?esc(p.n):""}" autocomplete="off"></div><div class="people"><div class="plist">${groups}</div><div id="pd"></div></div></div>`;
+ $("main").innerHTML=`<div class="page"><div class="psearch"><button class="back" data-v="settings">← 設定</button><input id="psearch" type="search" placeholder="搜尋人名或詞語" value="${person<0?esc(p.n):""}" autocomplete="off"></div><div class="people"><div class="plist">${groups}</div><div id="pd"></div></div></div>`;
  document.querySelector(".plist .on")?.scrollIntoView({block:"nearest",inline:"center"});
  const C=await countFor(p);
  const tot=C.map(b=>b.reduce((s,x)=>s+x,0)),max=Math.max(...tot,1),nb=tot.filter(x=>x).length,sum=tot.reduce((s,x)=>s+x,0);
@@ -329,7 +329,7 @@ async function renderCo(){
  const m=store.me;
  if(!m||!m.name){$("main").innerHTML=`<div class="page"><div class="phead"><h1>共讀</h1></div>
   <div class="co-start"><p>取一個朋友認得出來的暱稱。</p><div class="ask"><input id="coname" maxlength="20" placeholder="暱稱"><button class="btn" data-act="coname">開始</button></div><div class="status" id="cost"></div></div></div>`;return}
- const card=g=>`<section class="cog"><div class="cog-h"><h2>${esc(g.name)}</h2><span class="sp"></span><span class="cog-n">${g.members.length} / 6</span></div>
+ const card=g=>`<section class="cog"><div class="cog-h"><h2>${esc(g.name)}</h2><button class="linkbtn" data-coren="${g.gid}" data-coname="${esc(g.name)}">改名</button><span class="sp"></span><span class="cog-n">${g.members.length} / 6</span></div>
   <div class="cog-m">${g.members.map(x=>{const st=x.st;return `<div class="com ${st?(st.ok?"ok":"todo"):""}"><div class="com-a">${x.avatar?`<img src="${x.avatar}" alt="">`:esc((x.name||"?").slice(0,1))}</div><div class="com-b"><div class="com-n">${esc(x.name)}${x.me?"<small>（我）</small>":""}</div>
    ${st?`<div class="com-t"><b>Today:</b> ${esc(st.today)}</div><div class="com-p">${esc(st.plan)}｜第 ${st.day} / ${st.days} 天｜連續 ${st.streak} 天</div><div class="com-bar"><i style="width:${st.pct}%"></i></div>`:`<div class="com-p">還沒有進度</div>`}</div></div>`}).join("")}</div>
   <div class="cog-f"><span class="cog-code">邀請碼 <b>${g.gid}</b></span><button class="btn ghost" data-cocopy="${g.gid}">複製邀請連結</button><button class="linkbtn" data-coleave="${g.gid}">離開</button></div></section>`;
@@ -356,7 +356,7 @@ function renderSettings(){
  const tok=ls.get("br.gh",""),last=ls.get("br.synced",0);
  $("main").innerHTML=`<div class="page set"><h1>設定</h1>
  <div class="grp"><h3>頭像</h3><div class="row"><div class="av-prev">${store.me?.avatar?`<img src="${store.me.avatar}" alt="">`:esc((store.me?.name||"?").slice(0,1))}</div><label class="btn ghost" style="cursor:pointer">上傳照片<input type="file" id="avatar" accept="image/*" hidden></label>${store.me?.avatar?'<button class="linkbtn" data-act="avclear">移除</button>':""}</div><div class="status" id="avst"></div></div>
- <div class="grp"><h3>人物 <span class="beta">Beta 實驗性功能</span></h3><button class="btn ghost" data-v="people">打開人物</button></div>
+ <div class="grp"><h3>人物誌 <span class="beta">Beta</span></h3><button class="btn ghost" data-v="people">進入人物誌</button></div>
  <div class="grp"><h3>外觀</h3><div class="seg">${[["auto","跟隨系統"],["light","淺色"],["dark","深色"]].map(([k,t])=>`<button data-theme="${k}" class="${pref.theme==k?"on":""}">${t}</button>`).join("")}</div></div>
  <div class="grp"><h3>字級</h3><div class="seg">${[[17,"小"],[19,"中"],[21,"大"],[23,"特大"]].map(([k,t])=>`<button data-fs="${k}" class="${pref.fs==k?"on":""}">${t}</button>`).join("")}</div></div>
  <div class="grp"><h3>英文對照</h3><div class="seg"><button data-en="0" class="${pref.en?"":"on"}">關</button><button data-en="1" class="${pref.en?"on":""}">WEB</button></div></div>
@@ -437,6 +437,7 @@ document.addEventListener("click",e=>{
  if(d.en!=null){pref.en=d.en=="1";savePref();return renderSettings()}
  if(d.cocopy){const link=location.origin+location.pathname+"#join-"+d.cocopy;const msg=`一起來讀經！打開 ${link} ，或在「共讀」輸入邀請碼 ${d.cocopy}`;
   navigator.clipboard?.writeText(msg).then(()=>{t.textContent="已複製"},()=>{t.textContent=d.cocopy}).finally(()=>setTimeout(()=>t.textContent="複製邀請連結",2000));return}
+ if(d.coren){const n=(prompt("小組名稱",d.coname)||"").trim();if(!n||n===d.coname)return;coApi("rename",{gid:d.coren,name:n}).then(j=>{if(j.error)return alert(j.error);coCache=null;renderCo()});return}
  if(d.coleave){if(t.dataset.sure){coApi("leave",{gid:d.coleave}).then(()=>{coCache=null;renderCo()});return}t.dataset.sure=1;t.textContent="確定離開？";setTimeout(()=>{delete t.dataset.sure;t.textContent="離開"},3000);return}
  const a=d.act;
  if(a&&a.startsWith("co"))return coAction(a,t);
