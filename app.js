@@ -82,7 +82,7 @@ function dayDate(d){const s=new Date(store.plan.start.v+"T00:00:00");s.setDate(s
 /* ---------- theme ---------- */
 function applyPrefs(){
  if(pref.theme==="auto")document.documentElement.removeAttribute("data-theme");else document.documentElement.dataset.theme=pref.theme;
- document.documentElement.style.setProperty("--fs",(mobile()?pref.fs-1:pref.fs)+"px");
+ const z=pref.ui||1;document.documentElement.style.zoom=z;document.documentElement.style.setProperty("--fs",((mobile()?pref.fs-1:pref.fs)/z).toFixed(2)+"px");
 }
 
 /* ---------- shell ---------- */
@@ -371,7 +371,7 @@ function renderSettings(){
  <div class="grp"><h3>頭像</h3><div class="row"><div class="av-prev">${store.me?.avatar?`<img src="${store.me.avatar}" alt="">`:esc((store.me?.name||"?").slice(0,1))}</div><label class="btn ghost" style="cursor:pointer">上傳照片<input type="file" id="avatar" accept="image/*" hidden></label>${store.me?.avatar?'<button class="linkbtn" data-act="avclear">移除</button>':""}</div><div class="status" id="avst"></div></div>
  <div class="grp"><h3>人物誌 <span class="beta">Beta</span></h3><button class="btn ghost" data-v="people">進入人物誌</button></div>
  <div class="grp"><h3>外觀</h3><div class="seg">${[["auto","跟隨系統"],["light","淺色"],["dark","深色"]].map(([k,t])=>`<button data-theme="${k}" class="${pref.theme==k?"on":""}">${t}</button>`).join("")}</div></div>
- <div class="grp"><h3>字級</h3><div class="seg">${[[17,"小"],[19,"中"],[21,"大"],[23,"特大"]].map(([k,t])=>`<button data-fs="${k}" class="${pref.fs==k?"on":""}">${t}</button>`).join("")}</div></div>
+ <div class="grp"><div class="fsrow"><div><h3>系統字級</h3><div class="seg">${[[0.85,"小"],[1,"中"],[1.15,"大"]].map(([k,t])=>`<button data-ui="${k}" class="${(pref.ui||1)==k?"on":""}">${t}</button>`).join("")}</div></div><div><h3>經文字級</h3><div class="seg">${[[17,"小"],[19,"中"],[21,"大"],[23,"特大"]].map(([k,t])=>`<button data-fs="${k}" class="${pref.fs==k?"on":""}">${t}</button>`).join("")}</div></div></div></div>
  <div class="grp"><h3>英文對照</h3><div class="seg"><button data-en="0" class="${pref.en?"":"on"}">關</button><button data-en="1" class="${pref.en?"on":""}">WEB</button></div></div>
  <div class="grp"><h3>雲端同步</h3><p class="hint" style="margin-bottom:8px">GitHub Personal Access Token（只勾 gist 權限）。每台裝置填一次，劃線、筆記、進度會存在你的私人 Gist。</p>
   <div class="ask"><input id="gh" type="password" value="${esc(tok)}" placeholder="ghp_…" autocomplete="off"><button class="btn" data-act="sync">同步</button></div>
@@ -447,6 +447,7 @@ document.addEventListener("click",e=>{
  if(d.person!=null){person=+d.person;pbook=null;return renderPeople()}
  if(d.pb!=null){pbook=pbook==+d.pb?null:+d.pb;return renderPeople()}
  if(d.theme){pref.theme=d.theme;savePref();applyPrefs();return renderSettings()}
+ if(d.ui){pref.ui=+d.ui;savePref();applyPrefs();return renderSettings()}
  if(d.fs){pref.fs=+d.fs;savePref();applyPrefs();return renderSettings()}
  if(d.en!=null){pref.en=d.en=="1";savePref();return renderSettings()}
  if(d.cocopy){const link=location.origin+location.pathname+"#join-"+d.cocopy;const msg=`一起來讀經！打開 ${link} ，或在「共讀」輸入邀請碼 ${d.cocopy}`;

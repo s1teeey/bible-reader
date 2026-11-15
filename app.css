@@ -376,3 +376,8 @@ main{min-width:0;overflow:auto;position:relative}
 @media (min-width:721px){.updbar{bottom:24px}}
 .phead .todaypanel{margin:0 0 12px;padding:10px 12px}
 .phead .todaypanel .tp-l{margin-top:4px}
+.fsrow{display:flex;gap:16px;flex-wrap:nowrap;align-items:flex-end}
+.fsrow>div{min-width:0}
+.fsrow .seg{flex-wrap:nowrap;white-space:nowrap}
+.fsrow .seg button{padding:6px 10px}
+@media (max-width:380px){.fsrow{gap:10px}.fsrow .seg button{padding:6px 8px;font-size:13px}}
