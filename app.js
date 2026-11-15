@@ -67,7 +67,9 @@ function dayIndex(){const s=new Date(store.plan.start.v+"T00:00:00");const d=Mat
 const dayDone=d=>PLAN[d].every(([b,c])=>isRead(b,c));
 const chRef=([b,c])=>`${BOOKS[b][0]} ${c}`;
 function todayChip(){const d=dayIndex(),ok=dayDone(d),f=PLAN[d].find(([b,c])=>!isRead(b,c))||PLAN[d][0];
- return `<button class="today ${ok?"ok":"todo"}" data-go="${f[0]}.${f[1]}"><span>今日</span>${dayLabel(d)}${ok?" ✓":""}</button>`}
+ return `<button class="today ${ok?"ok":"todo"}" data-go="${f[0]}.${f[1]}"><span>Today:</span> ${dayLabel(d)}</button>`}
+function streak(){let k=dayIndex();if(!dayDone(k))k--;let n=0;while(k>=0&&dayDone(k)){n++;k--}return n}
+function streakChip(){const n=streak();return `<span class="streak ${n?"on":""}">連續完成 ${n} 天</span>`}
 function dayLabel(d){const g=[];PLAN[d].forEach(([b,c])=>{const x=g[g.length-1];if(x&&x.b==b)x.z=c;else g.push({b,a:c,z:c})});return g.map(x=>`${BOOKS[x.b][0]} ${x.a}${x.z!=x.a?"–"+x.z:""}`).join("、")}
 function dayDate(d){const s=new Date(store.plan.start.v+"T00:00:00");s.setDate(s.getDate()+d);return `${s.getMonth()+1}/${s.getDate()}（${"日一二三四五六"[s.getDay()]}）`}
 
@@ -119,27 +121,35 @@ async function renderRead(){
  const [book,guide]=await Promise.all([getBook(b),getGuide(b)]);
  curText=book[c-1];curGuide=guide[c-1]||null;
  const secs={};if(curGuide&&curGuide.o)curGuide.o.forEach(([t,r])=>{secs[parseRange(r)[0]]=t});
- const verses=curText.map(([n,zh,en])=>{const v=getV(b,c,n);let z=esc(zh);if(markRe)z=z.replace(markRe,"<mark>$&</mark>");
+ const verses=curText.map(([n,zh,en])=>{const v=getV(b,c,n);let z=zhHTML(zh,v);
   return `${secs[n]?`<div class="sec">${esc(secs[n])}</div>`:""}<div class="v ${v.h?"h-"+v.h:""} ${sel==n?"sel":""}" id="v${n}" data-n="${n}"><span class="n">${n}</span><span class="zh">${z}</span>${v.n?'<span class="dot"></span>':""}${pref.en&&en?`<span class="en">${esc(en)}</span>`:""}</div>`}).join("");
  const prev=ALL.findIndex(([x,y])=>x==b&&y==c);
  const P=ALL[prev-1],N=ALL[prev+1];
  $("main").innerHTML=`<div class="reader">
-  <div class="rhead"><div class="chead"><h1>${BOOKS[b][0]} ${c}</h1>${todayChip()}<span class="sp"></span>
+  <div class="rhead"><div class="chead"><h1>${BOOKS[b][0]} ${c}</h1>${streakChip()}<span class="sp"></span>
    <button class="toggle ${pref.en?"on":""}" data-act="en">EN</button>
    <button class="iconbtn" data-act="prev" ${P?"":"disabled"}>${I.l}</button><button class="iconbtn" data-act="next" ${N?"":"disabled"}>${I.r}</button></div>
-  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button><span class="sp"></span>${todayChip()}</div></div>
+  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button><span class="sp"></span>${streakChip()}</div></div>
   ${mseg=="guide"&&!wide()?`<div class="guide">${guideHTML()}</div>`:`<div class="text">${verses}</div>`}
   <div class="pager"><button data-act="prev" ${P?"":"hidden"}>← ${P?chRef(P):""}</button>
    <button data-act="next" class="${N?"":"done"}">${isRead(b,c)?"":"讀完，"}${N?chRef(N)+" →":"完成"}</button></div>
  </div>`;
  renderSide();
 }
+const BP="https://ik.imagekit.io/bpweb1/web/media/posters/";
+function bpRow(){const info=BOOKINFO[pref.b];if(!info)return"";const many=info.bp.length>1;
+ return `<div class="bprow"><b>BibleProject</b>${info.bp.map(([a,z,y])=>`<a href="https://www.youtube.com/watch?v=${y}" target="_blank" rel="noopener" class="${pref.c>=a&&pref.c<=z?"cur":""}">${many?`影片 ${a}–${z} 章`:"書卷導覽影片"}</a>`).join("")}<a href="https://bibleproject.com/zh-hans/explore/book-overviews/" target="_blank" rel="noopener">網站</a></div>`}
+function bookBg(){const i=BOOKINFO[pref.b];if(!i)return"";
+ return `<details class="bookbg"><summary>${BOOKS[pref.b][0]}書卷背景</summary><dl><dt>作者</dt><dd>${esc(i.a)}</dd><dt>寫作時間</dt><dd>${esc(i.t)}</dd><dt>寫作地點</dt><dd>${esc(i.p)}</dd><dt>讀者</dt><dd>${esc(i.r)}</dd><dt>主題</dt><dd>${esc(i.th)}</dd></dl><p>${esc(i.bg)}</p></details>`}
+function poster(){const i=BOOKINFO[pref.b];if(!i)return"";const p=(i.bp.find(([a,z])=>pref.c>=a&&pref.c<=z)||i.bp[0])[3];
+ return `<h3>海報</h3><button class="poster" data-poster="${p}"><img src="${BP}tr:w-900/${p}" alt="${BOOKS[pref.b][0]} BibleProject 海報" loading="lazy"></button>`}
 function guideHTML(){
- const g=curGuide;if(!g)return `<p class="empty">本章導讀尚未完成。</p>`;
+ const g=curGuide;if(!g)return bpRow()+bookBg()+poster()+`<p class="empty">本章導讀尚未完成。</p>`;
  const vt=r=>{const [a,z]=parseRange(r);return curText.filter(v=>v[0]>=a&&v[0]<=z).map(v=>v[1]).join("")};
- let h=`<div class="lead">${String(g.s).split("\n").map(p=>`<p>${fmt(p)}</p>`).join("")}</div>`;
+ let h=bpRow()+`<div class="lead">${String(g.s).split("\n").map(p=>`<p>${fmt(p)}</p>`).join("")}</div>`;
  if(g.k&&g.k.length)h+=`<h3>經文</h3>`+g.k.map(r=>`<blockquote>${esc(vt(r))}<cite>${pref.c}:${r}</cite></blockquote>`).join("");
  if(g.ctx)h+=`<h3>上下文</h3><p>${fmt(g.ctx)}</p>`;
+ h+=bookBg()+poster();
  if(g.o)h+=`<h3>架構</h3><ol class="outline">${g.o.map(([t,r])=>`<li data-jump="${parseRange(r)[0]}"><span>${esc(t)}</span><em>${r}</em></li>`).join("")}</ol>`;
  if(g.x)h+=`<h3>逐段釋經</h3>`+g.x.map(x=>`<div class="x"><h4 data-jump="${parseRange(x.r)[0]}"><em>${x.r} 節</em>${esc(x.h)}</h4>${(x.p||[]).map(p=>/^白話講[：:]/.test(p)?`<p class="plain"><b>白話講</b>　${fmt(p.replace(/^白話講[：:]/,""))}</p>`:`<p>${fmt(p)}</p>`).join("")}${x.l?`<ul>${x.l.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`:""}</div>`).join("");
  if(g.q)h+=`<h3>默想</h3><ul>${g.q.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`;
@@ -171,6 +181,25 @@ function pickVerse(n){
  if(wide()){pref.stab="note";savePref();renderSide()}
  else if(sel)openSheet(verseHTML());else closeSheet();
 }
+function zhHTML(zh,v){
+ const r=(v&&v.r)||[];
+ if(!r.length){let z=esc(zh);if(markRe)z=z.replace(markRe,"<mark>$&</mark>");return z}
+ const col=Array(zh.length).fill("");r.forEach(([a,b,k])=>{for(let i=Math.max(0,a);i<Math.min(zh.length,b);i++)col[i]=k});
+ let h="",i=0;while(i<zh.length){let j=i;while(j<zh.length&&col[j]===col[i])j++;const t=esc(zh.slice(i,j));h+=col[i]?`<span class="pr p-${col[i]}">${t}</span>`:t;i=j}return h}
+let selInfo=null;
+function readSel(){
+ const s=getSelection();if(!s||s.isCollapsed||!s.rangeCount)return null;const r=s.getRangeAt(0);
+ const zA=(r.startContainer.nodeType==1?r.startContainer:r.startContainer.parentElement).closest(".zh"),zB=(r.endContainer.nodeType==1?r.endContainer:r.endContainer.parentElement).closest(".zh");
+ if(!zA||zA!==zB)return null;const pre=document.createRange();pre.selectNodeContents(zA);pre.setEnd(r.startContainer,r.startOffset);
+ const a=pre.toString().length,b=a+r.toString().length;if(b<=a)return null;
+ return{n:+zA.closest(".v").dataset.n,a,b,rect:r.getBoundingClientRect()}}
+function showSelbar(){const info=readSel();const bar=$("#selbar");if(!info||pref.view!=="read"){bar.hidden=true;selInfo=null;return}
+ selInfo=info;bar.hidden=false;const w=bar.offsetWidth||220;let x=info.rect.left+info.rect.width/2-w/2;x=Math.max(8,Math.min(innerWidth-w-8,x));
+ let y=info.rect.top-52;if(y<60)y=info.rect.bottom+10;bar.style.left=x+"px";bar.style.top=y+"px"}
+function applyPartial(k){if(!selInfo)return;const {n,a,b}=selInfo;const v=getV(pref.b,pref.c,n);
+ let r=(v.r||[]).filter(([x,y])=>y<=a||x>=b);if(k)r.push([a,b,k]);setV(pref.b,pref.c,n,{r});
+ getSelection().removeAllRanges();$("#selbar").hidden=true;selInfo=null;
+ const el=document.getElementById("v"+n);if(el)el.querySelector(".zh").innerHTML=zhHTML((curText.find(x=>x[0]==n)||[])[1]||"",getV(pref.b,pref.c,n))}
 function refreshVerse(n){const el=document.getElementById("v"+n);if(!el)return;const v=getV(pref.b,pref.c,n);
  el.className=`v ${v.h?"h-"+v.h:""} ${sel==n?"sel":""}`;const dot=el.querySelector(".dot");if(v.n&&!dot)el.querySelector(".zh").insertAdjacentHTML("afterend",'<span class="dot"></span>');if(!v.n&&dot)dot.remove()}
 
@@ -221,6 +250,7 @@ function renderPlan(){
  const td=dayIndex(),done=PLAN.filter((_,d)=>dayDone(d)).length;
  $("main").innerHTML=`<div class="page"><div class="phead"><h1>${esc(curPlan.n)}<small>${done} / ${DAYS}</small></h1>
  <div class="progress"><i style="width:${done/DAYS*100}%"></i></div></div>
+ <div class="todaypanel ${dayDone(td)?"ok":"todo"}"><div class="tp-h"><b>Today:</b> ${dayLabel(td)}<span class="sp"></span>${streakChip()}</div><div class="tp-l">${PLAN[td].map(([b,c])=>`<a data-go="${b}.${c}" class="${isRead(b,c)?"read":""}">${BOOKS[b][0]} ${c}</a>`).join("")}</div></div>
  <div class="row" style="margin-bottom:18px"><select id="planpick" style="width:auto">${PLANS.map(p=>`<option value="${p.id}" ${p.id==curPlan.id?"selected":""}>${esc(p.n)}｜${p.d} 天</option>`).join("")}</select><span class="label" style="margin:0 0 0 8px">開始日期</span><input type="date" id="start" value="${store.plan.start.v}"></div>
  <div class="days">${PLAN.map((p,d)=>`<div class="day ${d==td?"today":""} ${dayDone(d)?"done":""}" id="day${d}"><span class="no">${String(d+1).padStart(2,"0")}</span><span class="rd" data-go="${p[0][0]}.${p[0][1]}">${dayLabel(d)}<span class="dt">${dayDate(d)}</span></span><button class="chk ${dayDone(d)?"on":""}" data-day="${d}">${dayDone(d)?I.ok:""}</button></div>`).join("")}</div></div>`;
  document.getElementById("day"+td)?.scrollIntoView({block:"center"});
@@ -239,13 +269,13 @@ function renderAINotes(){
 }
 async function renderNotes(){
  if(nfilter==="ai")return renderAINotes();
- const items=Object.entries(store.v).filter(([,v])=>(v.h||v.n)&&(nfilter=="all"||(nfilter=="n"?v.n:v.h))).map(([k,v])=>[k.split(".").map(Number),v]).sort((a,b)=>a[0][0]-b[0][0]||a[0][1]-b[0][1]||a[0][2]-b[0][2]);
+ const items=Object.entries(store.v).filter(([,v])=>(v.h||v.n||(v.r&&v.r.length))&&(nfilter=="all"||(nfilter=="n"?v.n:(v.h||(v.r&&v.r.length))))).map(([k,v])=>[k.split(".").map(Number),v]).sort((a,b)=>a[0][0]-b[0][0]||a[0][1]-b[0][1]||a[0][2]-b[0][2]);
  const books=[...new Set(items.map(x=>x[0][0]))];const texts=await Promise.all(books.map(getBook));const T={};books.forEach((b,i)=>T[b]=texts[i]);
  let h=`<div class="page"><div class="phead"><h1>筆記<small>${items.length}</small></h1><div class="filters">${NF()}</div></div><div class="nlist">`;
  let last=-1;
  for(const [[b,c,n],v] of items){if(b!=last){h+=`<div class="nb">${BOOKS[b][0]}</div>`;last=b}
   const zh=((T[b][c-1]||[]).find(x=>x[0]==n)||[])[1]||"";
-  h+=`<div class="nitem" data-goto="${b}.${c}.${n}"><div class="r">${c}:${n}</div><div><div class="t"><span style="${v.h?`background:linear-gradient(transparent 52%,var(--h${v.h}) 52%)`:""}">${esc(zh)}</span></div>${v.n?`<div class="note">${esc(v.n)}</div>`:""}</div></div>`}
+  h+=`<div class="nitem" data-goto="${b}.${c}.${n}"><div class="r">${c}:${n}</div><div><div class="t"><span style="${v.h?`background:linear-gradient(transparent 52%,var(--h${v.h}) 52%)`:""}">${zhHTML(zh,v)}</span></div>${v.n?`<div class="note">${esc(v.n)}</div>`:""}</div></div>`}
  if(!items.length)h+=`<p class="empty">還沒有劃線或筆記。</p>`;
  $("main").innerHTML=h+"</div></div>";
 }
@@ -336,7 +366,7 @@ async function sync(manual){
 
 /* ---------- events ---------- */
 document.addEventListener("click",e=>{
- const t=e.target.closest("button,[data-go],[data-goto],[data-pgo],[data-jump],[data-pick],.v,#sheetbg,[data-person]");if(!t)return;
+ const t=e.target.closest("#lightbox,button,[data-go],[data-goto],[data-pgo],[data-jump],[data-pick],.v,#sheetbg,[data-person]");if(!t)return;
  const d=t.dataset;
  if(t.id==="sheetbg"){closeSheet();if(sel){sel=null;document.querySelectorAll(".v.sel").forEach(x=>x.classList.remove("sel"))}return}
  if(d.v)return go(d.v);
@@ -344,18 +374,21 @@ document.addEventListener("click",e=>{
  if(d.goto){const [b,c,n]=d.goto.split(".").map(Number);return openChapter(b,c,{verse:n})}
  if(d.pgo){const [b,c,n]=d.pgo.split(".").map(Number);return openChapter(b,c,{verse:n,mark:pRe(curP(),"g")})}
  if(d.book!=null){pref.b=+d.book;pref.c=1;savePref();return openChapter(+d.book,1)}
- if(t.classList.contains("v"))return pickVerse(+d.n);
+ if(t.classList.contains("v")){if(getSelection().toString().trim())return;return pickVerse(+d.n)}
  if(d.jump){if(!wide()){mseg="text";renderRead().then(()=>{const el=document.getElementById("v"+d.jump);el?.scrollIntoView({block:"start"});el?.classList.add("flash")})}else{const el=document.getElementById("v"+d.jump);el?.scrollIntoView({block:"start",behavior:"smooth"});el?.classList.add("flash");setTimeout(()=>el?.classList.remove("flash"),1700)}return}
  if(d.pick){pickVerse(+d.pick);document.getElementById("v"+d.pick)?.scrollIntoView({block:"center",behavior:"smooth"});return}
  if(d.stab){pref.stab=d.stab;savePref();return renderSide()}
  if(d.seg){mseg=d.seg;return renderRead()}
  if(d.hl!=null&&sel){const cur=getV(pref.b,pref.c,sel).h;setV(pref.b,pref.c,sel,{h:d.hl&&d.hl!==cur?d.hl:""});refreshVerse(sel);document.querySelectorAll("[data-hl]").forEach(x=>x.classList.toggle("on",x.dataset.hl&&x.dataset.hl==getV(pref.b,pref.c,sel).h));return}
+ if(d.pr!=null)return applyPartial(d.pr);
+ if(d.poster){const lb=$("#lightbox");lb.hidden=false;lb.innerHTML=`<img src="${BP}tr:w-2400/${d.poster}" alt=""><a href="${BP}${d.poster}" target="_blank" rel="noopener">開啟原圖</a><button class="lbx" data-lbclose="1" aria-label="關閉">×</button>`;return}
+ if(d.lbclose||t.id==="lightbox"){$("#lightbox").hidden=true;return}
  if(d.ask)return ask(d.ask);
  if(d.aidel){const v=store.ai[d.aidel];if(v){store.ai[d.aidel]={...v,del:1,a:"",t:now()};saveStore()}document.querySelectorAll(".aihist").forEach(el=>el.outerHTML=aiHistHTML());if(pref.view==="notes")renderNotes();return}
  if(d.day!=null){const dd=+d.day,v=!dayDone(dd);PLAN[dd].forEach(([b,c])=>setRead(b,c,v));
   const row=document.getElementById("day"+dd);row.classList.toggle("done",v);t.classList.toggle("on",v);t.innerHTML=v?I.ok:"";
   const done=PLAN.filter((_,x)=>dayDone(x)).length;const sm=document.querySelector(".phead h1 small");if(sm)sm.textContent=`${done} / ${DAYS}`;
-  const bar=document.querySelector(".phead .progress i");if(bar)bar.style.width=done/DAYS*100+"%";renderRail();return}
+  const bar=document.querySelector(".phead .progress i");if(bar)bar.style.width=done/DAYS*100+"%";if(dd==dayIndex()){const y=scrollY,m=$("main").scrollTop;renderPlan();scrollTo(0,y);$("main").scrollTop=m}renderRail();return}
  if(d.nf){nfilter=d.nf;return renderNotes()}
  if(d.person!=null){person=+d.person;pbook=null;return renderPeople()}
  if(d.pb!=null){pbook=pbook==+d.pb?null:+d.pb;return renderPeople()}
@@ -396,6 +429,9 @@ let tx=null,ty=null;
 document.addEventListener("touchstart",e=>{if(pref.view!=="read"||wide()||!e.target.closest("main")){tx=null;return}tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
 document.addEventListener("touchend",e=>{if(tx==null)return;const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;tx=null;
  if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.5)return;const n=dx<0?"guide":"text";if(n===mseg)return;mseg=n;renderRead().then(()=>window.scrollTo(0,0))},{passive:true});
+document.addEventListener("selectionchange",()=>{clearTimeout(window._st);window._st=setTimeout(showSelbar,250)});
+document.addEventListener("pointerdown",e=>{if(e.target.closest("#selbar"))e.preventDefault()});
+addEventListener("scroll",()=>{if(!$("#selbar").hidden)showSelbar()},true);
 let lastWide=wide();addEventListener("resize",()=>{if(wide()!==lastWide){lastWide=wide();applyPrefs();render()}});
 
 (()=>{const d=dayIndex();if(dayDone(d))return;const f=PLAN[d].find(([b,c])=>!isRead(b,c));if(f){pref.b=f[0];pref.c=f[1];pref.view="read";savePref()}})();
