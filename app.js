@@ -103,7 +103,7 @@ function renderRail(){
  $("#books").innerHTML=h;
  const on=$("#books .chips .on");if(on&&!renderRail.did){on.scrollIntoView({block:"center"});renderRail.did=1}
 }
-function go(view){pref.view=view;savePref();sel=null;closeSheet();render();window.scrollTo(0,0);$("main").scrollTop=0}
+function go(view){pref.view=view;savePref();sel=null;closeSheet();window.scrollTo(0,0);$("main").scrollTop=0;render()}
 async function openChapter(b,c,opts={}){pref.b=b;pref.c=c;pref.view="read";savePref();sel=opts.verse||null;markRe=opts.mark||null;mseg="text";closeSheet();
  await render();
  if(opts.verse){const el=document.getElementById("v"+opts.verse);if(el){el.scrollIntoView({block:"center"});el.classList.add("flash")}}
@@ -258,17 +258,17 @@ function aiHistHTML(){
 function renderPlan(){
  const pick=`<select id="planpick" style="width:auto"><option value="none" ${noPlan()?"selected":""}>無計劃</option>${PLANS.map(p=>`<option value="${p.id}" ${p.id==curPlan.id?"selected":""}>${esc(p.n)}｜${p.d} 天</option>`).join("")}</select>`;
  if(noPlan()){const t=todayDone();const days=Array.from({length:30},(_,k)=>{const x=new Date();x.setDate(x.getDate()-k);return x});
-  $("main").innerHTML=`<div class="page"><div class="phead"><h1>無計劃<small>${streakChip()}</small></h1></div>
+  $("main").innerHTML=`<div class="page"><div class="phead"><h1>無計劃<small>${streakChip()}</small></h1><div class="pdates">${pick}</div></div>
   <div class="todaypanel ${t?"ok":"todo"}"><div class="tp-h"><b>Today:</b> ${t?"已完成":"還沒完成"}<span class="sp"></span><button class="btn ${t?"ghost":""}" data-dd="${todayStr()}">${t?"取消完成":"今天讀完了"}</button></div></div>
-  <div class="row" style="margin-bottom:18px">${pick}</div>
   <div class="days">${days.map((x,k)=>{const ds=dstr(x),ok=dailyDone(ds);return `<div class="day ${k==0?"today":""} ${ok?"done":""}"><span class="no">${x.getMonth()+1}/${x.getDate()}</span><span class="rd" style="cursor:default">${k==0?"今天":k==1?"昨天":"（"+"日一二三四五六"[x.getDay()]+"）"}</span><button class="chk ${ok?"on":""}" data-dd="${ds}">${ok?I.ok:""}</button></div>`}).join("")}</div></div>`;return}
  const td=dayIndex(),done=PLAN.filter((_,d)=>dayDone(d)).length;
+ const endD=new Date(store.plan.start.v+"T00:00:00");endD.setDate(endD.getDate()+DAYS-1);
  $("main").innerHTML=`<div class="page"><div class="phead"><h1>${esc(curPlan.n)}<small>${done} / ${DAYS}</small></h1>
- <div class="progress"><i style="width:${done/DAYS*100}%"></i></div></div>
+ <div class="progress"><i style="width:${done/DAYS*100}%"></i></div>
+ <div class="pdates">${pick}<div class="pd-row"><label>開始<input type="date" id="start" value="${store.plan.start.v}"></label><span>→</span><label>結束<input type="date" id="end" value="${dstr(endD)}"></label></div></div></div>
  <div class="todaypanel ${dayDone(td)?"ok":"todo"}"><div class="tp-h"><b>Today:</b> ${dayLabel(td)}<span class="sp"></span>${streakChip()}</div><div class="tp-l">${PLAN[td].map(([b,c])=>`<a data-go="${b}.${c}" class="${isRead(b,c)?"read":""}">${BOOKS[b][0]} ${c}</a>`).join("")}</div></div>
- <div class="row" style="margin-bottom:18px">${pick}<span class="label" style="margin:0 0 0 8px">開始日期</span><input type="date" id="start" value="${store.plan.start.v}"></div>
  <div class="days">${PLAN.map((p,d)=>`<div class="day ${d==td?"today":""} ${dayDone(d)?"done":""}" id="day${d}"><span class="no">${String(d+1).padStart(2,"0")}</span><span class="rd" data-go="${p[0][0]}.${p[0][1]}">${dayLabel(d)}<span class="dt">${dayDate(d)}</span></span><button class="chk ${dayDone(d)?"on":""}" data-day="${d}">${dayDone(d)?I.ok:""}</button></div>`).join("")}</div></div>`;
- document.getElementById("day"+td)?.scrollIntoView({block:"center"});
+ requestAnimationFrame(()=>document.getElementById("day"+td)?.scrollIntoView({block:"center"}));
 }
 
 /* ---------- notes ---------- */
@@ -472,7 +472,8 @@ document.addEventListener("input",e=>{
 });
 document.addEventListener("change",async e=>{
  if(e.target.id==="planpick"){store.plan.id={v:e.target.value,t:now()};setupPlan();saveStore();pushStatus();renderPlan();renderRail()}
- if(e.target.id==="start"&&e.target.value){store.plan.start={v:e.target.value,t:now()};saveStore();renderPlan();renderRail()}
+ if(e.target.id==="end"&&e.target.value&&DAYS){const x=new Date(e.target.value+"T00:00:00");x.setDate(x.getDate()-(DAYS-1));store.plan.start={v:dstr(x),t:now()};saveStore();pushStatus();renderPlan();renderRail();return}
+ if(e.target.id==="start"&&e.target.value){store.plan.start={v:e.target.value,t:now()};saveStore();pushStatus();renderPlan();renderRail()}
  if(e.target.id==="avatar"){const f=e.target.files[0];if(!f)return;const st=$("#avst");st.textContent="處理中…";
   try{const url=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)});
    const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});
