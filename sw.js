@@ -1,5 +1,5 @@
-const V="br-v4";
-const SHELL=["./","index.html","app.css?v=4","app.js?v=4","data/people.js?v=4","manifest.webmanifest","icons/icon-192.png"];
+const V="br-v5";
+const SHELL=["./","index.html","app.css?v=5","app.js?v=5","data/people.js?v=5","manifest.webmanifest","icons/icon-192.png"];
 self.addEventListener("install",e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(SHELL)));self.skipWaiting()});
 self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener("fetch",e=>{

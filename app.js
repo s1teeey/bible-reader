@@ -349,7 +349,10 @@ document.addEventListener("click",e=>{
  if(d.hl!=null&&sel){const cur=getV(pref.b,pref.c,sel).h;setV(pref.b,pref.c,sel,{h:d.hl&&d.hl!==cur?d.hl:""});refreshVerse(sel);document.querySelectorAll("[data-hl]").forEach(x=>x.classList.toggle("on",x.dataset.hl&&x.dataset.hl==getV(pref.b,pref.c,sel).h));return}
  if(d.ask)return ask(d.ask);
  if(d.aidel){const v=store.ai[d.aidel];if(v){store.ai[d.aidel]={...v,del:1,a:"",t:now()};saveStore()}document.querySelectorAll(".aihist").forEach(el=>el.outerHTML=aiHistHTML());if(pref.view==="notes")renderNotes();return}
- if(d.day!=null){const dd=+d.day,v=!dayDone(dd);PLAN[dd].forEach(([b,c])=>setRead(b,c,v));renderPlan();renderRail();return}
+ if(d.day!=null){const dd=+d.day,v=!dayDone(dd);PLAN[dd].forEach(([b,c])=>setRead(b,c,v));
+  const row=document.getElementById("day"+dd);row.classList.toggle("done",v);t.classList.toggle("on",v);t.innerHTML=v?I.ok:"";
+  const done=PLAN.filter((_,x)=>dayDone(x)).length;const sm=document.querySelector(".phead h1 small");if(sm)sm.textContent=`${done} / ${DAYS}`;
+  const bar=document.querySelector(".phead .progress i");if(bar)bar.style.width=done/DAYS*100+"%";renderRail();return}
  if(d.nf){nfilter=d.nf;return renderNotes()}
  if(d.person!=null){person=+d.person;pbook=null;return renderPeople()}
  if(d.pb!=null){pbook=pbook==+d.pb?null:+d.pb;return renderPeople()}
