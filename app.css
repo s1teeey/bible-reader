@@ -265,3 +265,10 @@ main{min-width:0;overflow:auto;position:relative}
 .mseg{gap:18px;border-bottom:1px solid var(--line);margin:0}
 .mseg button{font-weight:800;color:var(--muted);padding:6px 0 10px;border-bottom:2px solid transparent;font-size:15px}
 .mseg button.on{color:var(--ink);border-bottom-color:var(--accent)}
+.aihist{margin-top:14px;display:grid;gap:14px}
+.aiitem{border-top:1px solid var(--line);padding-top:12px}
+.aiq{font-weight:800;font-size:14.5px;display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+.aia{white-space:pre-wrap;font-size:14.5px;line-height:1.8;margin-top:4px}
+.aidt{font-size:12px;color:var(--faint);margin-top:4px}
+.aidel{color:var(--faint);font-size:18px;line-height:1;padding:0 4px}
+.aidel:hover{color:var(--ink)}

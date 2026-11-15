@@ -26,7 +26,7 @@ function setupPlan(){curPlan=PLANS.find(p=>p.id===(store.plan.id||{}).v)||PLANS[
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
 const todayStr=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
 let store=ls.get("br.store",null)||{v:{},read:{},plan:{start:{v:todayStr(),t:0},done:{}}};
-store.v=store.v||{};store.read=store.read||{};store.plan=store.plan||{start:{v:todayStr(),t:0},done:{}};
+store.v=store.v||{};store.read=store.read||{};store.ai=store.ai||{};store.plan=store.plan||{start:{v:todayStr(),t:0},done:{}};
 setupPlan();
 let pref=ls.get("br.pref",{b:5,c:1,en:false,theme:"auto",fs:19,view:"read",stab:"guide"});
 const savePref=()=>ls.set("br.pref",pref);
@@ -154,7 +154,7 @@ function verseHTML(){
   <div class="field"><div class="label">筆記</div><textarea id="note" placeholder="寫下領受或疑問">${esc(v.n||"")}</textarea></div>
   <div class="field"><div class="label">問 AI</div>${askHTML("v")}</div>`;
 }
-function askHTML(scope){return `<div class="ask"><input id="q-${scope}" placeholder="${scope=="v"?"這節的背景是什麼？":"這章的主旨是什麼？"}"><button class="btn" data-ask="${scope}">問</button></div><div class="answer" id="a-${scope}" hidden></div>`}
+function askHTML(scope){return `<div class="ask"><input id="q-${scope}" placeholder="${scope=="v"?"這節的背景是什麼？":"這章的主旨是什麼？"}"><button class="btn" data-ask="${scope}">問</button></div><div class="answer" id="a-${scope}" hidden></div>${aiHistHTML()}`}
 function renderSide(){
  if(!wide())return;
  const t=pref.stab;
@@ -180,24 +180,37 @@ function bookPicker(){
 }
 
 /* ---------- AI ---------- */
+const aiKey=()=>`${pref.b}.${pref.c}.${sel||0}`;
+const SYS="你是熟悉新約聖經、原文與歷史背景的查經同伴。用繁體中文回答，先講結論，再用簡短段落說明；必要時加一段「白話講」。不要說教。";
+async function callAI(prompt){
+ const key=ls.get("br.ai",""),code=ls.get("br.code","");
+ if(code){const r=await fetch(RELAY+"/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code,prompt})});const j=await r.json();
+  if(j.used!=null)ls.set("br.quota",{used:j.used,limit:j.limit});return j.error?{error:j.error}:{text:j.text}}
+ const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-beta":"server-side-fallback-2026-07-01","anthropic-dangerous-direct-browser-access":"true"},
+  body:JSON.stringify({model:"claude-sonnet-5-5",max_tokens:4000,output_config:{effort:"low"},fallbacks:"default",system:SYS,messages:[{role:"user",content:prompt}]})});
+ const j=await r.json();
+ if(j.stop_reason==="refusal")return{error:"這個問題沒有得到回答，換個問法試試。"};
+ return j.content?{text:j.content.filter(x=>x.type==="text").map(x=>x.text).join("")}:{error:"錯誤："+(j.error?.message||r.status)};
+}
 async function ask(scope){
- const q=$("#q-"+scope).value.trim(),out=$("#a-"+scope);
+ const qi=$("#q-"+scope),out=$("#a-"+scope);
  const b=pref.b,c=pref.c,n=sel;
  const vt=n?(curText.find(x=>x[0]==n)||[])[1]:"";
+ const q=qi.value.trim()||(n?"請解釋這節的意思、上下文與背景。":"請說明這章的主旨、架構與重點。");
  const ctx=n?`經文：${BOOKS[b][0]} ${c}:${n}「${vt}」`:`經文：${BOOKS[b][0]} 第 ${c} 章\n`+curText.map(v=>v[0]+" "+v[1]).join("\n");
- const prompt=`${ctx}\n\n問題：${q||(n?"請解釋這節的意思、上下文與背景。":"請說明這章的主旨、架構與重點。")}`;
- const key=ls.get("br.ai",""),code=ls.get("br.code","");
- if(!key&&code){out.hidden=false;out.textContent="…";
-  try{const r=await fetch(RELAY+"/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code,prompt})});const j=await r.json();
-   out.textContent=j.error?j.error:j.text;if(j.used!=null)ls.set("br.quota",{used:j.used,limit:j.limit})}catch(e){out.textContent="連線失敗："+e.message}
-  return}
- if(!key){window.open("https://claude.ai/new?q="+encodeURIComponent(prompt),"_blank");return}
- out.hidden=false;out.textContent="…";
- try{const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":key,"anthropic-version":"2023-06-01","anthropic-beta":"server-side-fallback-2026-07-01","anthropic-dangerous-direct-browser-access":"true"},
-  body:JSON.stringify({model:"claude-sonnet-5-5",max_tokens:4000,output_config:{effort:"low"},fallbacks:"default",system:"你是熟悉新約聖經、原文與歷史背景的查經同伴。用繁體中文回答，先講結論，再用簡短段落說明；必要時加一段「白話講」。不要說教。",messages:[{role:"user",content:prompt}]})});
-  const j=await r.json();
-  if(j.stop_reason==="refusal"){out.textContent="這個問題沒有得到回答，換個問法試試。";return}
-  out.textContent=j.content?j.content.filter(x=>x.type==="text").map(x=>x.text).join(""):"錯誤："+(j.error?.message||r.status)}catch(e){out.textContent="連線失敗："+e.message}
+ const prompt=`${ctx}\n\n問題：${q}`;
+ if(!ls.get("br.ai","")&&!ls.get("br.code","")){window.open("https://claude.ai/new?q="+encodeURIComponent(prompt),"_blank");return}
+ const k=aiKey();out.hidden=false;out.textContent="…";
+ let res;try{res=await callAI(prompt)}catch(e){res={error:"連線失敗："+e.message}}
+ if(res.error){out.textContent=res.error;return}
+ store.ai["a"+now()]={k,q,a:res.text,t:now()};saveStore();
+ out.hidden=true;qi.value="";
+ document.querySelectorAll(".aihist").forEach(el=>el.outerHTML=aiHistHTML());
+}
+function aiHistHTML(){
+ const k=aiKey();
+ const list=Object.entries(store.ai).filter(([,v])=>v.k===k&&!v.del).sort((a,b)=>b[1].t-a[1].t);
+ return `<div class="aihist">${list.map(([id,v])=>`<div class="aiitem"><div class="aiq">${esc(v.q)}<button class="aidel" data-aidel="${id}" aria-label="刪除">×</button></div><div class="aia">${esc(v.a)}</div><div class="aidt">${new Date(v.t).toLocaleDateString("zh-TW")}</div></div>`).join("")}</div>`;
 }
 
 /* ---------- plan ---------- */
@@ -212,10 +225,20 @@ function renderPlan(){
 
 /* ---------- notes ---------- */
 let nfilter="all";
+const NF=()=>[["all","全部"],["n","筆記"],["h","劃線"],["ai","AI 問答"]].map(([k,t])=>`<button data-nf="${k}" class="${nfilter==k?"on":""}">${t}</button>`).join("");
+function renderAINotes(){
+ const list=Object.entries(store.ai).filter(([,v])=>!v.del).map(([id,v])=>[id,v,v.k.split(".").map(Number)]).sort((a,b)=>a[2][0]-b[2][0]||a[2][1]-b[2][1]||a[2][2]-b[2][2]||b[1].t-a[1].t);
+ let h=`<div class="page"><div class="phead"><h1>筆記<small>${list.length}</small></h1><div class="filters">${NF()}</div></div><div class="nlist">`,last=-1;
+ for(const [id,v,[b,c,n]] of list){if(b!=last){h+=`<div class="nb">${BOOKS[b][0]}</div>`;last=b}
+  h+=`<div class="nitem" data-goto="${b}.${c}.${n||1}"><div class="r">${c}${n?":"+n:" 章"}</div><div><div class="aiq">${esc(v.q)}</div><div class="note">${esc(v.a.length>160?v.a.slice(0,160)+"…":v.a)}</div></div></div>`}
+ if(!list.length)h+=`<p class="empty">還沒有 AI 問答。</p>`;
+ $("main").innerHTML=h+"</div></div>";
+}
 async function renderNotes(){
+ if(nfilter==="ai")return renderAINotes();
  const items=Object.entries(store.v).filter(([,v])=>(v.h||v.n)&&(nfilter=="all"||(nfilter=="n"?v.n:v.h))).map(([k,v])=>[k.split(".").map(Number),v]).sort((a,b)=>a[0][0]-b[0][0]||a[0][1]-b[0][1]||a[0][2]-b[0][2]);
  const books=[...new Set(items.map(x=>x[0][0]))];const texts=await Promise.all(books.map(getBook));const T={};books.forEach((b,i)=>T[b]=texts[i]);
- let h=`<div class="page"><div class="phead"><h1>筆記<small>${items.length}</small></h1><div class="filters">${[["all","全部"],["n","筆記"],["h","劃線"]].map(([k,t])=>`<button data-nf="${k}" class="${nfilter==k?"on":""}">${t}</button>`).join("")}</div></div><div class="nlist">`;
+ let h=`<div class="page"><div class="phead"><h1>筆記<small>${items.length}</small></h1><div class="filters">${NF()}</div></div><div class="nlist">`;
  let last=-1;
  for(const [[b,c,n],v] of items){if(b!=last){h+=`<div class="nb">${BOOKS[b][0]}</div>`;last=b}
   const zh=((T[b][c-1]||[]).find(x=>x[0]==n)||[])[1]||"";
@@ -273,7 +296,8 @@ function renderSettings(){
  <div class="grp"><h3>AI 邀請碼</h3><div class="ask"><input id="code" value="${esc(ls.get("br.code",""))}" placeholder="例如 ab3k-9xmp" autocomplete="off" autocapitalize="off"><button class="btn" data-act="quota">確認</button></div>
   <div class="status" id="quotast">${(q=>q?`本月已用 US$${q.used.toFixed(2)} / US$${q.limit}`:"")(ls.get("br.quota",null))}</div>
   <p class="hint" style="margin-top:6px">沒有邀請碼時，按「問」會開啟 claude.ai。</p></div>
- <div class="grp"><h3>自己的 API Key</h3><input id="ak" type="password" value="${esc(ls.get("br.ai",""))}" placeholder="sk-ant-…（選填）" autocomplete="off"></div>
+ <div class="grp"><h3>自己的 API Key</h3><div class="ask"><input id="ak" type="password" placeholder="${ls.get("br.ai","")?"已儲存（…"+esc(ls.get("br.ai","").slice(-4))+"）":"sk-ant-…（選填）"}" autocomplete="off"><button class="btn" data-act="aksave">儲存</button>${ls.get("br.ai","")?'<button class="btn ghost" data-act="akclear">清除</button>':""}</div>
+  <div class="status" id="akst">${ls.get("br.code","")?"有邀請碼時會優先使用邀請碼。":""}</div></div>
  <div class="grp"><h3>資料</h3><div class="row"><button class="btn ghost" data-act="export">匯出</button><label class="btn ghost" style="cursor:pointer">匯入<input type="file" id="imp" accept=".json" hidden></label></div></div>
  </div>`;
 }
@@ -281,7 +305,7 @@ function renderSettings(){
 /* ---------- sync (GitHub Gist) ---------- */
 const FILE="bible-reader.json";
 function mergeMap(a={},b={}){const o={...a};for(const k in b)if(!o[k]||(b[k].t||0)>(o[k].t||0))o[k]=b[k];return o}
-function merge(a,b){return{v:mergeMap(a.v,b.v),read:mergeMap(a.read,b.read),plan:{start:(b.plan?.start?.t||0)>(a.plan?.start?.t||0)?b.plan.start:a.plan.start,id:(b.plan?.id?.t||0)>(a.plan?.id?.t||0)?b.plan.id:a.plan?.id,done:{}}}}
+function merge(a,b){return{v:mergeMap(a.v,b.v),read:mergeMap(a.read,b.read),ai:mergeMap(a.ai,b.ai),plan:{start:(b.plan?.start?.t||0)>(a.plan?.start?.t||0)?b.plan.start:a.plan.start,id:(b.plan?.id?.t||0)>(a.plan?.id?.t||0)?b.plan.id:a.plan?.id,done:{}}}}
 let syncing=false;
 async function sync(manual){
  const tok=ls.get("br.gh","");const st=$("#syncst");
@@ -324,6 +348,7 @@ document.addEventListener("click",e=>{
  if(d.seg){mseg=d.seg;return renderRead()}
  if(d.hl!=null&&sel){const cur=getV(pref.b,pref.c,sel).h;setV(pref.b,pref.c,sel,{h:d.hl&&d.hl!==cur?d.hl:""});refreshVerse(sel);document.querySelectorAll("[data-hl]").forEach(x=>x.classList.toggle("on",x.dataset.hl&&x.dataset.hl==getV(pref.b,pref.c,sel).h));return}
  if(d.ask)return ask(d.ask);
+ if(d.aidel){const v=store.ai[d.aidel];if(v){store.ai[d.aidel]={...v,del:1,a:"",t:now()};saveStore()}document.querySelectorAll(".aihist").forEach(el=>el.outerHTML=aiHistHTML());if(pref.view==="notes")renderNotes();return}
  if(d.day!=null){const dd=+d.day,v=!dayDone(dd);PLAN[dd].forEach(([b,c])=>setRead(b,c,v));renderPlan();renderRail();return}
  if(d.nf){nfilter=d.nf;return renderNotes()}
  if(d.person!=null){person=+d.person;pbook=null;return renderPeople()}
@@ -335,6 +360,8 @@ document.addEventListener("click",e=>{
  if(a=="en"){pref.en=!pref.en;savePref();return renderRead()}
  if(a=="prev"||a=="next"){const i=ALL.findIndex(([x,y])=>x==pref.b&&y==pref.c);if(a=="next")setRead(pref.b,pref.c,true);const n=ALL[i+(a=="next"?1:-1)];if(n)openChapter(n[0],n[1]);else renderRead();return}
  if(a=="pick")return bookPicker();
+ if(a=="aksave"){const v=$("#ak").value.trim();if(!v)return;if(!/^sk-ant-/.test(v)){$("#akst").textContent="格式不對，API key 應該以 sk-ant- 開頭。";return}ls.set("br.ai",v);return renderSettings()}
+ if(a=="akclear"){ls.set("br.ai","");return renderSettings()}
  if(a=="quota"){const st=$("#quotast");const code=$("#code").value.trim();ls.set("br.code",code);if(!code)return;st.textContent="…";
   fetch(RELAY+"/quota",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code})}).then(r=>r.json()).then(j=>{if(j.error){st.textContent=j.error;return}ls.set("br.quota",{used:j.used,limit:j.limit});st.textContent=`${j.name}｜本月已用 US$${j.used.toFixed(2)} / US$${j.limit}`}).catch(e=>st.textContent="連線失敗："+e.message);return}
  if(a=="sync"){ls.set("br.gh",$("#gh").value.trim());return sync(true)}
@@ -342,7 +369,6 @@ document.addEventListener("click",e=>{
 });
 document.addEventListener("input",e=>{
  if(e.target.id==="note"&&sel){setV(pref.b,pref.c,sel,{n:e.target.value});refreshVerse(sel)}
- if(e.target.id==="ak")ls.set("br.ai",e.target.value.trim());
  if(e.target.id==="gh")ls.set("br.gh",e.target.value.trim());
  if(e.target.id==="code")ls.set("br.code",e.target.value.trim());
 });
