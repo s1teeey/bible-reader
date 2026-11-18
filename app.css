@@ -393,3 +393,4 @@ main{min-width:0;overflow:auto;position:relative}
 .guide .qa summary::before{content:"問　";color:var(--accent-ink)}
 .guide .qa summary::-webkit-details-marker{display:none}
 .guide .qa details p{margin:6px 0 2px;color:var(--ink)}
+.guide .para sup{font-size:11px;font-weight:800;color:var(--muted);margin-right:4px;vertical-align:.3em}

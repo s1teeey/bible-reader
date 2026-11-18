@@ -155,11 +155,10 @@ function guideHTML(){
  const g=curGuide;if(!g)return bpRow()+bookBg()+poster()+`<p class="empty">本章導讀尚未完成。</p>`;
  const vt=r=>{const [a,z]=parseRange(r);return curText.filter(v=>v[0]>=a&&v[0]<=z).map(v=>v[1]).join("")};
  let h=bpRow()+`<div class="lead">${String(g.s).split("\n").map(p=>`<p>${fmt(p)}</p>`).join("")}</div>`;
- if(g.k&&g.k.length)h+=`<h3>經文</h3>`+g.k.map(r=>`<blockquote>${esc(vt(r))}<cite>${pref.c}:${r}</cite></blockquote>`).join("");
  if(g.ctx)h+=`<h3>上下文</h3><p>${fmt(g.ctx)}</p>`;
  h+=bookBg()+poster();
  if(g.o)h+=`<h3>架構</h3><ol class="outline">${g.o.map(([t,r])=>`<li data-jump="${parseRange(r)[0]}"><span>${esc(t)}</span><em>${r}</em></li>`).join("")}</ol>`;
- if(g.x)h+=`<h3>逐段釋經</h3>`+g.x.map(x=>`<div class="x"><h4 data-jump="${parseRange(x.r)[0]}"><em>${x.r} 節</em>${esc(x.h)}</h4>${x.w?`<div class="para"><div class="para-l">白話文</div>${String(x.w).split("\n").map(t=>`<p>${fmt(t)}</p>`).join("")}</div>`:""}${(x.p||[]).filter(p=>!/^白話講[：:]/.test(p)).map(p=>`<p>${fmt(p)}</p>`).join("")}${x.qa?`<div class="qa">${x.qa.map(([q,a])=>`<details><summary>${esc(q)}</summary><p>${fmt(a)}</p></details>`).join("")}</div>`:""}${x.l?`<ul>${x.l.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`:""}</div>`).join("");
+ if(g.x)h+=`<h3>逐段釋經</h3>`+g.x.map(x=>`<div class="x"><h4 data-jump="${parseRange(x.r)[0]}"><em>${x.r} 節</em>${esc(x.h)}</h4>${(x.p||[]).filter(p=>!/^白話講[：:]/.test(p)).map(p=>`<p>${fmt(p)}</p>`).join("")}${x.qa?`<div class="qa">${x.qa.map(([q,a])=>`<details><summary>${esc(q)}</summary><p>${fmt(a)}</p></details>`).join("")}</div>`:""}${x.l?`<ul>${x.l.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`:""}${x.w?`<div class="para"><div class="para-l">白話文</div>${String(x.w).split("\n").map(t=>{const m=t.match(/^(\d+)\s+/);return `<p>${m?`<sup>${m[1]}</sup>`:""}${fmt(m?t.slice(m[0].length):t)}</p>`}).join("")}</div>`:""}</div>`).join("");
  if(g.q)h+=`<h3>默想</h3><ul>${g.q.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`;
  return h;
 }
