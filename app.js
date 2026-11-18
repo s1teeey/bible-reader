@@ -137,8 +137,8 @@ async function renderRead(){
   <div class="rhead"><div class="chead"><h1>${BOOKS[b][0]} ${c}</h1>${streakChip()}<span class="sp"></span>
    <button class="toggle ${pref.en?"on":""}" data-act="en">EN</button>
    <button class="iconbtn" data-act="prev" ${P?"":"disabled"}>${I.l}</button><button class="iconbtn" data-act="next" ${N?"":"disabled"}>${I.r}</button></div>
-  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button><button class="${mseg=="ai"?"on":""}" data-seg="ai">AI</button><span class="sp"></span>${streakChip()}</div></div>
-  ${mseg=="guide"&&!wide()?`<div class="guide">${guideHTML()}</div>`:mseg=="ai"&&!wide()?`<div class="aitab"><div class="label">${BOOKS[b][0]} ${c}${sel?":"+sel:""}${sel?' <button class="linkbtn" data-aiall="1">改問整章</button>':""}</div>${askHTML(sel?"v":"c")}</div>`:`<div class="text">${verses}</div>`}
+  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button><button class="${mseg=="qa"?"on":""}" data-seg="qa">問答</button><button class="${mseg=="ai"?"on":""}" data-seg="ai">AI</button><span class="sp"></span>${streakChip()}</div></div>
+  ${mseg=="guide"&&!wide()?`<div class="guide">${guideHTML()}</div>`:mseg=="qa"&&!wide()?`<div class="guide">${qaHTML()}</div>`:mseg=="ai"&&!wide()?`<div class="aitab"><div class="label">${BOOKS[b][0]} ${c}${sel?":"+sel:""}${sel?' <button class="linkbtn" data-aiall="1">改問整章</button>':""}</div>${askHTML(sel?"v":"c")}</div>`:`<div class="text">${verses}</div>`}
   <div class="pager"><button data-act="prev" ${P?"":"hidden"}>← ${P?chRef(P):""}</button>
    <button data-act="next" class="${N?"":"done"}">${isRead(b,c)?"":"讀完，"}${N?chRef(N)+" →":"完成"}</button></div>
  </div>`;
@@ -158,9 +158,14 @@ function guideHTML(){
  if(g.ctx)h+=`<h3>上下文</h3><p>${fmt(g.ctx)}</p>`;
  h+=bookBg()+poster();
  if(g.o)h+=`<h3>架構</h3><ol class="outline">${g.o.map(([t,r])=>`<li data-jump="${parseRange(r)[0]}"><span>${esc(t)}</span><em>${r}</em></li>`).join("")}</ol>`;
- if(g.x)h+=`<h3>逐段釋經</h3>`+g.x.map(x=>`<div class="x"><h4 data-jump="${parseRange(x.r)[0]}"><em>${x.r} 節</em>${esc(x.h)}</h4>${(x.p||[]).filter(p=>!/^白話講[：:]/.test(p)).map(p=>`<p>${fmt(p)}</p>`).join("")}${x.qa?`<div class="qa">${x.qa.map(([q,a])=>`<details><summary>${esc(q)}</summary><p>${fmt(a)}</p></details>`).join("")}</div>`:""}${x.l?`<ul>${x.l.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`:""}${x.w?`<div class="para"><div class="para-l">白話文</div>${String(x.w).split("\n").map(t=>{const m=t.match(/^(\d+)\s+/);return `<p>${m?`<sup>${m[1]}</sup>`:""}${fmt(m?t.slice(m[0].length):t)}</p>`}).join("")}</div>`:""}</div>`).join("");
+ if(g.x)h+=`<h3>逐段釋經</h3>`+g.x.map(x=>`<div class="x"><h4 data-jump="${parseRange(x.r)[0]}"><em>${x.r} 節</em>${esc(x.h)}</h4>${(x.p||[]).filter(p=>!/^白話講[：:]/.test(p)).map(p=>`<p>${fmt(p)}</p>`).join("")}${x.l?`<ul>${x.l.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`:""}${x.w?`<div class="para"><div class="para-l">白話文</div>${String(x.w).split("\n").map(t=>{const m=t.match(/^(\d+)\s+/);return `<p>${m?`<sup>${m[1]}</sup>`:""}${fmt(m?t.slice(m[0].length):t)}</p>`}).join("")}</div>`:""}</div>`).join("");
  if(g.q)h+=`<h3>默想</h3><ul>${g.q.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`;
  return h;
+}
+function qaHTML(){
+ const g=curGuide,xs=(g&&g.x||[]).filter(x=>x.qa&&x.qa.length);
+ if(!xs.length)return `<p class="empty">本章問答尚未完成。</p>`;
+ return xs.map(x=>`<div class="x"><h4 data-jump="${parseRange(x.r)[0]}"><em>${x.r} 節</em>${esc(x.h)}</h4><div class="qa">${x.qa.map(([q,a])=>`<details><summary>${esc(q)}</summary><p>${fmt(a)}</p></details>`).join("")}</div></div>`).join("");
 }
 function verseHTML(){
  const b=pref.b,c=pref.c;
@@ -178,8 +183,8 @@ function askHTML(scope){return `<div class="ask"><input id="q-${scope}" placehol
 function renderSide(){
  if(!wide())return;
  const t=pref.stab;
- $("#side").innerHTML=`<div class="stabs">${[["guide","導讀"],["note","劃線筆記"],["ai","問 AI"]].map(([k,n])=>`<button data-stab="${k}" aria-selected="${t==k}">${n}</button>`).join("")}</div>
- <div class="spane">${t=="guide"?`<div class="guide">${guideHTML()}</div>`:t=="note"?verseHTML():`<div class="label">${BOOKS[pref.b][0]} ${pref.c}${sel?":"+sel:""}</div>${askHTML("c")}`}</div>`;
+ $("#side").innerHTML=`<div class="stabs">${[["guide","導讀"],["note","劃線筆記"],["qa","問答"],["ai","問 AI"]].map(([k,n])=>`<button data-stab="${k}" aria-selected="${t==k}">${n}</button>`).join("")}</div>
+ <div class="spane">${t=="guide"?`<div class="guide">${guideHTML()}</div>`:t=="note"?verseHTML():t=="qa"?`<div class="guide">${qaHTML()}</div>`:`<div class="label">${BOOKS[pref.b][0]} ${pref.c}${sel?":"+sel:""}</div>${askHTML("c")}`}</div>`;
 }
 function pickVerse(n){
  sel=sel==n?null:n;
@@ -499,7 +504,7 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState===
 let tx=null,ty=null;
 document.addEventListener("touchstart",e=>{if(pref.view!=="read"||wide()||!e.target.closest("main")){tx=null;return}tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
 document.addEventListener("touchend",e=>{if(tx==null)return;const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;tx=null;
- if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.5)return;const order=["text","guide","ai"],k=order.indexOf(mseg)+(dx<0?1:-1);if(k<0||k>2)return;const n=order[k];if(n===mseg)return;mseg=n;renderRead().then(()=>window.scrollTo(0,0))},{passive:true});
+ if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.5)return;const order=["text","guide","qa","ai"],k=order.indexOf(mseg)+(dx<0?1:-1);if(k<0||k>3)return;const n=order[k];if(n===mseg)return;mseg=n;renderRead().then(()=>window.scrollTo(0,0))},{passive:true});
 document.addEventListener("selectionchange",()=>{clearTimeout(window._st);window._st=setTimeout(showSelbar,250)});
 document.addEventListener("pointerdown",e=>{if(e.target.closest("#selbar"))e.preventDefault()});
 addEventListener("scroll",()=>{if(!$("#selbar").hidden)showSelbar()},true);
