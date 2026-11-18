@@ -137,8 +137,8 @@ async function renderRead(){
   <div class="rhead"><div class="chead"><h1>${BOOKS[b][0]} ${c}</h1>${streakChip()}<span class="sp"></span>
    <button class="toggle ${pref.en?"on":""}" data-act="en">EN</button>
    <button class="iconbtn" data-act="prev" ${P?"":"disabled"}>${I.l}</button><button class="iconbtn" data-act="next" ${N?"":"disabled"}>${I.r}</button></div>
-  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button><span class="sp"></span>${streakChip()}</div></div>
-  ${mseg=="guide"&&!wide()?`<div class="guide">${guideHTML()}</div>`:`<div class="text">${verses}</div>`}
+  <div class="mseg"><button class="${mseg=="text"?"on":""}" data-seg="text">經文</button><button class="${mseg=="guide"?"on":""}" data-seg="guide">導讀</button><button class="${mseg=="ai"?"on":""}" data-seg="ai">AI</button><span class="sp"></span>${streakChip()}</div></div>
+  ${mseg=="guide"&&!wide()?`<div class="guide">${guideHTML()}</div>`:mseg=="ai"&&!wide()?`<div class="aitab"><div class="label">${BOOKS[b][0]} ${c}${sel?":"+sel:""}${sel?' <button class="linkbtn" data-aiall="1">改問整章</button>':""}</div>${askHTML(sel?"v":"c")}</div>`:`<div class="text">${verses}</div>`}
   <div class="pager"><button data-act="prev" ${P?"":"hidden"}>← ${P?chRef(P):""}</button>
    <button data-act="next" class="${N?"":"done"}">${isRead(b,c)?"":"讀完，"}${N?chRef(N)+" →":"完成"}</button></div>
  </div>`;
@@ -159,7 +159,7 @@ function guideHTML(){
  if(g.ctx)h+=`<h3>上下文</h3><p>${fmt(g.ctx)}</p>`;
  h+=bookBg()+poster();
  if(g.o)h+=`<h3>架構</h3><ol class="outline">${g.o.map(([t,r])=>`<li data-jump="${parseRange(r)[0]}"><span>${esc(t)}</span><em>${r}</em></li>`).join("")}</ol>`;
- if(g.x)h+=`<h3>逐段釋經</h3>`+g.x.map(x=>`<div class="x"><h4 data-jump="${parseRange(x.r)[0]}"><em>${x.r} 節</em>${esc(x.h)}</h4>${(x.p||[]).map(p=>/^白話講[：:]/.test(p)?`<p class="plain"><b>白話講</b>　${fmt(p.replace(/^白話講[：:]/,""))}</p>`:`<p>${fmt(p)}</p>`).join("")}${x.l?`<ul>${x.l.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`:""}</div>`).join("");
+ if(g.x)h+=`<h3>逐段釋經</h3>`+g.x.map(x=>`<div class="x"><h4 data-jump="${parseRange(x.r)[0]}"><em>${x.r} 節</em>${esc(x.h)}</h4>${x.w?`<div class="para"><div class="para-l">白話文</div>${String(x.w).split("\n").map(t=>`<p>${fmt(t)}</p>`).join("")}</div>`:""}${(x.p||[]).filter(p=>!/^白話講[：:]/.test(p)).map(p=>`<p>${fmt(p)}</p>`).join("")}${x.qa?`<div class="qa">${x.qa.map(([q,a])=>`<details><summary>${esc(q)}</summary><p>${fmt(a)}</p></details>`).join("")}</div>`:""}${x.l?`<ul>${x.l.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`:""}</div>`).join("");
  if(g.q)h+=`<h3>默想</h3><ul>${g.q.map(i=>`<li>${fmt(i)}</li>`).join("")}</ul>`;
  return h;
 }
@@ -173,7 +173,7 @@ function verseHTML(){
  return `<div class="vref">${BOOKS[b][0]} ${c}:${sel}</div><div class="vtext">${esc(t)}</div>
   <div class="colors">${COLORS.map(k=>`<button class="c-${k} ${v.h==k?"on":""}" data-hl="${k}" aria-label="劃線"></button>`).join("")}<button class="c-x" data-hl="">清除</button></div>
   <div class="field"><div class="label">筆記</div><textarea id="note" placeholder="寫下領受或疑問">${esc(v.n||"")}</textarea></div>
-  <div class="field"><div class="label">問 AI</div>${askHTML("v")}</div>`;
+  <button class="btn ghost" data-askverse="1">問 AI 這一節</button>`;
 }
 function askHTML(scope){return `<div class="ask"><input id="q-${scope}" placeholder="${scope=="v"?"這節的背景是什麼？":"這章的主旨是什麼？"}"><button class="btn" data-ask="${scope}">問</button></div><div class="answer" id="a-${scope}" hidden></div>${aiHistHTML()}`}
 function renderSide(){
@@ -222,7 +222,7 @@ function bookPicker(b){
 
 /* ---------- AI ---------- */
 const aiKey=()=>`${pref.b}.${pref.c}.${sel||0}`;
-const SYS="你是熟悉新約聖經、原文與歷史背景的查經同伴。用繁體中文回答，先講結論，再用簡短段落說明；必要時加一段「白話講」。不要說教。";
+const SYS="你是熟悉新約聖經、原文與歷史背景的查經同伴。用繁體中文回答，先講結論，再用簡短段落說明；必要時附上一段白話文翻譯。不要說教。";
 async function callAI(prompt){
  const key=ls.get("br.ai",""),code=ls.get("br.code","");
  if(code){const r=await fetch(RELAY+"/ask",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({code,prompt})});const j=await r.json();
@@ -430,6 +430,8 @@ document.addEventListener("click",e=>{
  if(d.pick){pickVerse(+d.pick);document.getElementById("v"+d.pick)?.scrollIntoView({block:"center",behavior:"smooth"});return}
  if(d.stab){pref.stab=d.stab;savePref();return renderSide()}
  if(d.seg){mseg=d.seg;return renderRead()}
+ if(d.askverse){closeSheet();if(wide()){pref.stab="ai";savePref();renderSide()}else{mseg="ai";renderRead().then(()=>scrollTo(0,0))}return}
+ if(d.aiall){sel=null;return renderRead()}
  if(d.hl!=null&&sel){const cur=getV(pref.b,pref.c,sel).h;setV(pref.b,pref.c,sel,{h:d.hl&&d.hl!==cur?d.hl:""});refreshVerse(sel);document.querySelectorAll("[data-hl]").forEach(x=>x.classList.toggle("on",x.dataset.hl&&x.dataset.hl==getV(pref.b,pref.c,sel).h));return}
  if(d.pr!=null)return applyPartial(d.pr);
  if(d.poster){const lb=$("#lightbox");lb.hidden=false;lb.innerHTML=`<img src="${BP}tr:w-2400/${d.poster}" alt=""><a href="${BP}${d.poster}" target="_blank" rel="noopener">開啟原圖</a><button class="lbx" data-lbclose="1" aria-label="關閉">×</button>`;return}
@@ -498,7 +500,7 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState===
 let tx=null,ty=null;
 document.addEventListener("touchstart",e=>{if(pref.view!=="read"||wide()||!e.target.closest("main")){tx=null;return}tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
 document.addEventListener("touchend",e=>{if(tx==null)return;const dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;tx=null;
- if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.5)return;const n=dx<0?"guide":"text";if(n===mseg)return;mseg=n;renderRead().then(()=>window.scrollTo(0,0))},{passive:true});
+ if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.5)return;const order=["text","guide","ai"],k=order.indexOf(mseg)+(dx<0?1:-1);if(k<0||k>2)return;const n=order[k];if(n===mseg)return;mseg=n;renderRead().then(()=>window.scrollTo(0,0))},{passive:true});
 document.addEventListener("selectionchange",()=>{clearTimeout(window._st);window._st=setTimeout(showSelbar,250)});
 document.addEventListener("pointerdown",e=>{if(e.target.closest("#selbar"))e.preventDefault()});
 addEventListener("scroll",()=>{if(!$("#selbar").hidden)showSelbar()},true);

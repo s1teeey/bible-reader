@@ -381,3 +381,15 @@ main{min-width:0;overflow:auto;position:relative}
 .fsrow .seg{flex-wrap:nowrap;white-space:nowrap}
 .fsrow .seg button{padding:6px 10px}
 @media (max-width:380px){.fsrow{gap:10px}.fsrow .seg button{padding:6px 8px;font-size:13px}}
+
+.aitab{padding-top:4px}
+.aitab .label{display:flex;gap:10px;align-items:baseline}
+.guide .para{background:var(--bg-soft);border-radius:8px;padding:12px 14px;margin:6px 0 12px}
+.guide .para-l{font-size:12px;font-weight:900;letter-spacing:.06em;color:var(--accent-ink);margin-bottom:6px}
+.guide .para p{margin:0 0 6px;line-height:1.9}
+.guide .qa{margin:4px 0 10px;border-top:1px solid var(--line)}
+.guide .qa details{border-bottom:1px solid var(--line);padding:8px 0}
+.guide .qa summary{cursor:pointer;font-weight:800;list-style:none}
+.guide .qa summary::before{content:"問　";color:var(--accent-ink)}
+.guide .qa summary::-webkit-details-marker{display:none}
+.guide .qa details p{margin:6px 0 2px;color:var(--ink)}
